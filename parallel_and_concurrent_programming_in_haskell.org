@@ -1,0 +1,51 @@
+#+Title: Parallel and Concurrent Programming in Haskell: Notes
+#+Author: Anton Logvinenko
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
+
+* Concurrency and Parallelism
+** Concurrency vs parallelism
+*Parallel program* uses a multiplicity of hardware to perform a computation more quickly: *to arrive at the answer earlier*.
+Alternatives: better algorithm, lower quality, better hardware.
+
+*Concurrency*: program-structuring technique in which there are *multiple threads of control* to
+*interact with multiple independent external agents*.
+Conceptually, threads run at the same time whether they actually execute at the same time is an implementation detail.
+Alternatives: event loops, callbacks.
+
+** Determinism vs non-determinism
+*Detetrministic* programming model: a program can give only one result.
+*Non-deterministic* programming model: a program may have many results.
+
+** Relation between determinism and concurrency/parallelism
+*Concurrent* programming models are necessarily *non-deterministic*. They interact with external agents that cause events at unpredictable times.
+Most *parallel* programming models can be deterministic. Exceptions:
+ - some algorithms depend on internal non-determinism
+ - when you want to parallelize programs that do have side effects
+
+* Parallel Haskell
+** Basic Parallelism: the Par Monad
+*** Lazy Evaluation, Weak Head Normal Form
+
+
+** Subsection
+ bla
+ 1. dasd
+ 2. asdasdas
+    
+*** Subsubsection
+ 
+adasdf
+asdfasdf
+asdfasdf
+sdf
+asdfasdf
+**** Paragraph
+dfdfasfasdf
+***** Subparagraph
+asdaSDASFAS
+FASDFASDF
+asdfsfasdf
+****** itemize
+asdasd
+******* subitemize
+
