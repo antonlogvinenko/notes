@@ -1,32 +1,44 @@
-#+Title: Parallel and Concurrent Programming in Haskell: Notes
+#+Title: Parallel and Concurrent Programming in Haskell: Summary
 #+Author: Anton Logvinenko
+#+Email: anton.logvinenko@gmail.com
 #+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
+
+* Intro
+This is a summary of Simon Marlow's book [[https://simonmar.github.io/pages/pcph.html]["Parallel and Concurrent Prorgamming in Haskell"]].
+Free online version is available [[https://www.oreilly.com/library/view/parallel-and-concurrent/9781449335939/][here]].
 
 * Concurrency and Parallelism
 *Parallel program* uses a multiplicity of hardware to perform a computation more quickly: *to arrive at the answer earlier*.
 Alternatives: better algorithm, lower quality, better hardware.
-
 *Concurrency*: program-structuring technique in which there are *multiple threads of control* to
 *interact with multiple independent external agents*.
 Conceptually, threads run at the same time whether they actually execute at the same time is an implementation detail.
 Alternatives: event loops, callbacks.
-\\
 
-*Detetrministic* programming model: a program can give only one result.
+*Detetrministic* programming model: a program can give only one result. *Non-deterministic* programming model: a program may have many results.
 
-*Non-deterministic* programming model: a program may have many results.
-\\
-
-*Concurrent* programming models are necessarily *non-deterministic*. They interact with external agents that cause events at unpredictable times.
-Most *parallel* programming models can be deterministic. Exceptions:
+*Concurrent* programming models are *necessarily non-deterministic*. They interact with external agents that cause events at unpredictable times.
+*Most parallel* programming models *can be deterministic*. Exceptions:
  - some algorithms depend on internal non-determinism
  - when you want to parallelize programs that do have side effects
-\\
 
 *In Haskell*, concurrency (in general) is a structuring technique for effectful code.
 Pure code has no effects to observe & evaluation order doesn't matter.
 
 * Parallel Haskell
+*Automatic parallelization problem*: to make program faster we need to gain more from parallelism than we lose due to overhead.
+*Alternative*: use profiling to find candidates for parallelism. Parallel programs in Haskell *elimitate* some difficulties:
+ - parallel programming is deterministic in Haskell
+ - use of high-level & declarative models, without having to deal with synchronization and communication: programmer indicates where the parallelism is & the RTS will handle the details of running program in parallel
+  - programs are abstract and likely to work on more hardware
+  - takes advantage of RTS GC
+  - but performance problems can be hard to understand
+
+The main thing to think about in parallel Haskell is *partitioning*:
+ - *granularity*: large enough to dwarf overhead, but not too large to keep all CPUs busy
+ - *data dependencies*: when one task depends on another htye must be executed sequentially
+   - *implicit data dependencies* are more concise, but it may be more difficult to reason about performance and fix problems
+   - *explicit data dependencies* are less concise but easier to analyze
 
 ** Basic Parallelism: the Par Monad
 *** Lazy Evaluation, Weak Head Normal Form
