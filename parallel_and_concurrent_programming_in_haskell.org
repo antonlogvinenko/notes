@@ -6,6 +6,7 @@
 #+latex_header: \linespread{1}
 #+MACRO: PB @@latex:\pagebreak@@
 
+
 * Intro
 This is a summary of Simon Marlow's book [[https://simonmar.github.io/pages/pcph.html]["Parallel and Concurrent Prorgamming in Haskell"]].
 Free online version is available [[https://www.oreilly.com/library/view/parallel-and-concurrent/9781449335939/][here]].
@@ -102,5 +103,45 @@ runEval $ do
    return (a, b)
 #+END_SRC
 
+*** ThreadScope, compiler & executable options for parallelism
+Compiler:
+ - =eventlog= enable =-l= option for binary
+ - =threaded= compile with parallelis,
+ - =rtsoprts= enable +RTS option for binary
+Executable:
+ - =+RTS= starts passing RTS flags
+ - =-RTS= closes sequemce of RTS flags (optional if nothing goes after them)
+ - =+RTS -s= display statistics
+ - =-RTS -l= generate log that can be opened with ThreadScope
 
+*** GHC dynamic partitioning
+GHC sparks:
+ - =rpar= argument is a *spark*
+ - sparks are collected in a pool
+ - sparks are taken from pool when processors are available
+ - RTS uses work stealing to execute sparks
+GHC spark can be in following states:
+ - *converted* into real parallism
+ - *overflowed* pool of limited size was overflowed, sparks dropped
+ - *dud*: rpar was applied to already evaluated expression
+ - *GC'd*: spark was found to be unused by the program
+ - *fizzled*: unevaluated when pased to rpar, but evaluated later (dropped from pool)
 
+*** Amdahl's Law
+*P*: portion of the program that can be parallelized
+
+*N*: number of available processors
+
+Then the optimal work layout is defined as:
+\begin{equation}
+(1-P)+P/N
+\end{equation}
+
+And theoretically possible speedup is:
+\begin{equation}
+\frac{1}{(1-P) + \frac{P}{N}}
+\end{equation}
+
+*** Tools to evaluate in WHNF
+
+*** Tools to evaluate in NF
