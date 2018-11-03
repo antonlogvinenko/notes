@@ -2,10 +2,16 @@
 #+Author: Anton Logvinenko
 #+Email: anton.logvinenko@gmail.com
 #+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
+#+latex_header: \usepackage{parskip}
+#+latex_header: \linespread{1}
+#+MACRO: PB @@latex:\pagebreak@@
 
 * Intro
 This is a summary of Simon Marlow's book [[https://simonmar.github.io/pages/pcph.html]["Parallel and Concurrent Prorgamming in Haskell"]].
 Free online version is available [[https://www.oreilly.com/library/view/parallel-and-concurrent/9781449335939/][here]].
+
+
+{{{PB}}}
 
 * Concurrency and Parallelism
 *Parallel program* uses a multiplicity of hardware to perform a computation more quickly: *to arrive at the answer earlier*.
@@ -25,6 +31,8 @@ Alternatives: event loops, callbacks.
 *In Haskell*, concurrency (in general) is a structuring technique for effectful code.
 Pure code has no effects to observe & evaluation order doesn't matter.
 
+{{{PB}}}
+
 * Parallel Haskell
 *Automatic parallelization problem*: to make program faster we need to gain more from parallelism than we lose due to overhead.
 *Alternative*: use profiling to find candidates for parallelism. Parallel programs in Haskell *elimitate* some difficulties:
@@ -40,29 +48,59 @@ The main thing to think about in parallel Haskell is *partitioning*:
    - *implicit data dependencies* are more concise, but it may be more difficult to reason about performance and fix problems
    - *explicit data dependencies* are less concise but easier to analyze
 
+{{{PB}}}
+
 ** Basic Parallelism: the Par Monad
 *** Lazy Evaluation, Weak Head Normal Form
+Relevant commands:
+ - =:sprint= prints value without causing it to be evaluated
+ - =seq a b= evals a to WHNF, then returns *b*
+
+General principles:
+ - defining an expression causes a /thunk/ to be built
+ - a thunk remains /unevaluated/ until the value is required
+ - once evaluated, the thunk is /replaced/ by a value
+
+An expression is in WHNF if it's either:
+ - a constructor: =True=, =(:) 1=
+ - lambda abstraction: =\x -> expression=
+ - built-in function applied to too few arguments: =(+) 2=
+Exception: fully applied constructor for a datatype with some fields declared strict.
+
+How to test whether in WHNF:
+ * =:sprint x=
+ * =seq x ()=
+ * =:sprint x=
+ * If =:sprtin x= gives identical results then *x* was in WHNF
+
+*** The Eval Monad, rpar, and rseq
+#+BEGIN_SRC Haskell
+data Eval a
+instance Monad Eval
+
+runEval :: Eval a -> a
+rpar    :: a -> Eval a   ;;evaluate in parallel, don't wait
+rseq    :: a -> Eval a   ;;evaluate & wait
+#+END_SRC
+
+Typical use
+ if we expect to generate *more parallelism* soon or if we *don't depend on the result* of either operations
+#+BEGIN_SRC Haskell
+runEval $ do
+   a <- rpar (f x)
+   b <- rpar (f y)
+   return (a, b)
+#+END_SRC
+
+Typical use if we *generated all the parallelism* we need or if we *depend on results* of operations:
+#+BEGIN_SRC Haskell
+runEval $ do
+   a <- rpar (f x)
+   b <- rpar (f y)
+   rseq a
+   rseq b
+   return (a, b)
+#+END_SRC
 
 
-** Subsection
- bla
- 1. dasd
- 2. asdasdas
-    
-*** Subsubsection
- 
-adasdf
-asdfasdf
-asdfasdf
-sdf
-asdfasdf
-**** Paragraph
-dfdfasfasdf
-***** Subparagraph
-asdaSDASFAS
-FASDFASDF
-asdfsfasdf
-****** itemize
-asdasd
-******* subitemize
 
