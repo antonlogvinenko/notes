@@ -5,8 +5,7 @@
 #+latex_header: \usepackage{parskip}
 #+latex_header: \linespread{1}
 #+MACRO: PB @@latex:\pagebreak@@ @@html: <hr/>@@ @@ascii: |||||@@
-
-
+#+LATEX_HEADER: \usepackage[margin=0.75in]{geometry}
 
 * Intro
 This is a summary of Simon Marlow's book [[https://simonmar.github.io/pages/pcph.html]["Parallel and Concurrent Prorgamming in Haskell"]].
