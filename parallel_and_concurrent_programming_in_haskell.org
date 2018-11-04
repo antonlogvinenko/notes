@@ -361,7 +361,47 @@ print $ snd ((1 `div` 0, "Hello!") `using` rdeepseq)
 
 ** Dataflow Pararllelism: The Par Monad
 
+There are important differences between the *Eval* and *Par* monad.
+
+The *Eval* monad *pros*:
+ - Decouples parallelism from algorithm
+ - Composable evaluation strategies are possible
+ - Can have as much parallelism as possible
+The *Eval* monad *cons*:
+ - We might not always want to build a lazy data structure
+ - Might be tricky to doagnose and understand performance
+The *Par* monad *pros*:
+ - Explicit about granularity and data dependencies
+ - Possible to avoid reliance on lazy evaluation but without sacrificing the determinism
+The *Par* monad *cons*:
+ - Only as much parallelism as there are pipelines
+ - Only full structure evaluation is possible
+
 *** Par Monad
+Par monad related definitions:
+#+BEGIN_SRC
+newtype Par a
+instance Applicative Par
+instance Monad Par
+runPar :: Par a -> a
+fork :: Par () -> Par ()
+#+END_SRC
+
+IVar related definitions:
+#+BEGIN_SRC
+data IVar a
+new  :: Par (IVar a)
+put  :: NFData a => IVar a -> a -> Par ()  ;;strict, runs rdeepseq on a, hence NFData restriction
+put_ :: IVar a -> a -> Par ()              ;;evaluates a to WHNF
+get  :: IVar a -> Par a                    ;;blocking operation
+#+END_SRC
+
+Few important notes:
+ - =put= operation is strict because if we request a parallel operation inside =Par= monad then it makes sense to make full evaluation a default behavior
+ - =put_= is for when you want WNHF instead of NF, which is not a primary case by design
+ - =get= operation will block
+ - =IVar= instances are intended to be used in the =Par= monad where they were created. Breaking this rule might lead to deadlocks, runtime errors or other bad things.
+
 
 *** Dataflow Parallelism
 
