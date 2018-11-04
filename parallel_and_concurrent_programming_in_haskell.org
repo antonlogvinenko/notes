@@ -4,7 +4,8 @@
 #+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
 #+latex_header: \usepackage{parskip}
 #+latex_header: \linespread{1}
-#+MACRO: PB @@latex:\pagebreak@@
+#+MACRO: PB @@latex:\pagebreak@@ @@html: <hr/>@@ @@ascii: |||||@@
+
 
 
 * Intro
@@ -143,5 +144,134 @@ And theoretically possible speedup is:
 \end{equation}
 
 *** Tools to evaluate in WHNF
+ Evaluate *a* to WHNF, then return *b*
+#+BEGIN_SRC
+seq a b :: a -> b -> b
+#+END_SRC
+ Evaluate *a* to WHNF in IO:
+#+BEGIN_SRC
+evaluate :: a -> IO a
+#+END_SRC
 
 *** Tools to evaluate in NF
+Let's introduce a special class type:
+#+BEGIN_SRC
+class NFData where
+   rnf :: a -> ()
+   rnf a = a `seq` ()
+#+END_SRC
+It defaults to =seq= behavior which is fine for structures like =Bool=:
+#+BEGIN_SRC
+instance NFData Bool   ;;and many others in Control.Deepseq
+#+END_SRC
+Here's how to define instances for more complex datatypes:
+#+BEGIN_SRC
+instance NFData a => NFData (Tree a) where
+   rnf Empty = ()
+   rnf (Branch l a r) = rnf l `seq` rnf a `seq` rnf r
+#+END_SRC
+Higher level functions based on =NFData=:
+#+BEGIN_SRC
+deepseq :: NFData a => a -> b -> b   ;;like seq but for NF, not WHNF
+deepseq a b = rnf a `seq` b
+
+force :: NFData => a -> a
+force x  = x `deepseq` x
+#+END_SRC
+
+*** NF/WHNF summary
+Evaluation to varying degrees is possible:
+ - *WHNF*, O(1), weak evaluation
+ - *NF*, O(n), deep evaluation (traverses the whole structure)
+
+{{{PB}}}
+
+** Evaluation Strategies
+
+*** Strategies
+Let's define the following type:
+#+BEGIN_SRC
+type Strategy a = a -> Eval a
+#+END_SRC
+
+Now we can speculate that =rpar= and =rseq= are also strategies:
+#+BEGIN_SRC
+rpar :: Strategy a
+rseq :: Strategy a
+#+END_SRC
+
+We can introduce a little helper function:
+#+BEGIN_SRC
+using :: a -> Strategy a -> a
+x `using` s = runEval (s x)
+#+END_SRC
+
+Now we can define higher level strategies:
+#+BEGIN_SRC
+parPair :: Strategy (a, b)
+parPair (a, b) = do
+   a' <- rpar a
+   b' <- rpar b
+   return (a', b')
+#+END_SRC
+
+We can use =parPair= stratey:
+#+BEGIN_SRC
+runEval (runPair(fib 35, fib 36))
+#+END_SRC
+
+Or if we rewrite with =using=:
+#+BEGIN_SRC
+(fib 35, fib 36) `using` parPair
+#+END_SRC
+
+*** Parameterized Strategies
+We can define functions that build new strategies using existing ones.
+
+First, let's make strategy =evalPair= for pair evaluation that is customizable by separate strategies for its components:
+#+BEGIN_SRC
+evalPair :: Strategy a -> Strategy b -> Strategy (a, b)
+evalPair sa sb (a, b) = do
+   a' <- sa a
+   b' <- sb b
+   return (a', b')
+#+END_SRC
+Second, let's define strategy =parPair= for parallel pair evaluation that is customizable by separate strategies for its components.
+But first let's look at =rparWith= strategy that runs evaluation with supplied strategy but in parallel:
+#+BEGIN_SRC
+rparWith :: Strategy :: Strategy a -> Strategy a
+rparWith strat = parEval . strat
+#+END_SRC
+Now let's use =rparWith= and =evalPair= to define =parPair=:
+#+BEGIN_SRC
+parPair :: Strategy a -> Straetgy b -> Strategy (a, b)
+parPair sa sb = evalPair (rparWith sa) (rparWith sb)
+#+END_SRC
+Third, let's look at =rdeepseq= function:
+#+BEGIN_SRC
+rdeepseq :: NFData a => Strategy a
+rdeepseq x = rseq (force x)
+#+END_SRC
+Now let's use it to build the final strategy:
+#+BEGIN_SRC
+parPair rdeepseq rdeepseq :: (NFData a, NFData b) => Strategy (a, b)
+#+END_SRC
+We build a strategy that deeply evaluates pair components in parallel by doing following steps:
+ - Defined =evalPair=
+ - =evalPair= with =rparWith= gave us =parPair=
+ - =parPair= with =rdeepseq= gave us the final strategy
+Let's use one more function, =r0=:
+#+BEGIN_SRC
+r0 :: Strategy a
+r0 x = return x
+#+END_SRC
+Function =r0= avoids evaluation. Let's build a strategy that doesn't evaluate second components of a pair of pairs:
+#+BEGIN_SRC
+evalPair (evalPair rpar r0) (evalPair rpar r0) :: Strategy ((a, b), (a, b))
+#+END_SRC
+
+*** Practical Considerations
+
+*** GC'd Sparks, Speculative Parallelism
+
+*** The Identity Property
