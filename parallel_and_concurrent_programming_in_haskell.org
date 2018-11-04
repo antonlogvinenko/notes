@@ -4,11 +4,14 @@
 #+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
 #+latex_header: \usepackage{parskip}
 #+latex_header: \linespread{1}
-#+MACRO: PB @@latex:\pagebreak@@ @@html: <hr/>@@ @@ascii: |||||@@
+#+MACRO: PB @@latex:\pagebreak@@ @@html: <br/><br/><br/><hr/><br/><br/><br/>@@ @@ascii: |||||@@
 #+LATEX_HEADER: \usepackage[margin=0.75in]{geometry}
+
+{{{PB}}}
 
 * Intro
 This is a summary of Simon Marlow's book [[https://simonmar.github.io/pages/pcph.html]["Parallel and Concurrent Prorgamming in Haskell"]].
+
 Free online version is available [[https://www.oreilly.com/library/view/parallel-and-concurrent/9781449335939/][here]].
 
 
@@ -51,7 +54,7 @@ The main thing to think about in parallel Haskell is *partitioning*:
 
 {{{PB}}}
 
-** Basic Parallelism: the Par Monad
+** Basic Parallelism: the Eval Monad
 *** Lazy Evaluation, Weak Head Normal Form
 Relevant commands:
  - =:sprint= prints value without causing it to be evaluated
@@ -269,8 +272,99 @@ Function =r0= avoids evaluation. Let's build a strategy that doesn't evaluate se
 evalPair (evalPair rpar r0) (evalPair rpar r0) :: Strategy ((a, b), (a, b))
 #+END_SRC
 
-*** Practical Considerations
+*** Speculative parallelism
+Let's consider the following =evalList= implementations:
+#+BEGIN_SRC
+parList1 :: Strategy a -> Strategy [a]
+parList1 stat = evalList (rparWith strat)
 
-*** GC'd Sparks, Speculative Parallelism
+evalList :: Strategy a -> Strategy [a]
+evalList strat [] = return []
+evalList strat (x:xs) = do
+   x' <- strat x
+   xs <- evalList strat xs
+   return (x':xs')
+
+parList2 :: Strategy a -> Strategy [a]
+parList2 strat xs = do
+   go xs
+   return xs
+where
+   go []     = return ()
+   go (x:xs) = do rparWith strat x
+                  go xs
+#+END_SRC
+
+Impotant thing to note is that in =parList1= we're building a new list. It might look like we might just generate sparks that would evaluate list items in parallel, as we did in =parList2=.
+But this assumption is not true: if we only generate sparks, then only pool will reference them and they would be GC'd, i.e. we'd witness *speculative parallelism*.
+Since we don't want it in this particular case, we need to have something else to reference sparks, hence building the resulting list: =parList1= is the correct implementation, =parList2= is not.
+
+To summarize, a *bad use* of strategy looks like:
+#+BEGIN_SRC
+do
+   ...
+   rpar (f x)
+   ...
+#+END_SRC
+*Good use* of stragy looks like:
+#+BEGIN_SRC
+do
+   ...
+   y <- rpar (f x)
+   ... y ...
+#+END_SRC
+Or like this, if *y* is used somewhere in the program:
+#+BEGIN_SRC
+do
+   ...
+   rpar y
+   ...
+#+END_SRC
+
+*** Practical considerations
+ - *Spark generation* will be likely done on different cores (switching cores)
+ - *Granularity*
+  - Generate enough work to make CPUs busy
+  - But not too much
+   - Overhead per chunk: creating, running
+   - Amount of sequential work increases: need to merge results
+
+*** Higher level functions
+=parBuffer= creates sparks only for *N* first elements of list and keeps the number of sparks equal to *N* when some are evaluated:
+#+BEGIN_SRC
+parBuffer :: Int -> Strategy a -> Strategy [a]
+#+END_SRC
+
+=parListChunk= creates chunks of *N* elements each:
+#+BEGIN_SRC
+parListChunk :: Int -> Strategy a -> Strategy [a]
+#+END_SRC
+
+=withStrategy= is an alias for =using=:
+#+BEGIN_SRC
+withStrategy s x == x `using` s
+#+END_SRC
 
 *** The Identity Property
+The value strategy returns must be equal to the value it was passed:
+#+BEGIN_SRC
+x `using` s == x
+#+END_SRC
+But there's a *caveat* though: =x `using` s= might be less defined than x, because it might evaluate more structure of x.
+For example, compare how following expressions would be evaluated:
+#+BEGIN_SRC
+print $ snd (1 `div` 0, "Hello!")
+print $ snd ((1 `div` 0, "Hello!") `using` rdeepseq)
+#+END_SRC
+
+{{{PB}}}
+
+** Dataflow Pararllelism: The Par Monad
+
+*** Par Monad
+
+*** Dataflow Parallelism
+
+*** Pipeline Parallelism & Limiting the Producer
+
+*** Using Different Schedulers
