@@ -577,7 +577,7 @@ improt Control.Monad.Par.Scheds.Trace
 | Speculative parallelism   | Yes                                | No (sparks are always executed)             |
 | ThreadScope integration   | Yes                                | No                                          |
 | Overhead                  | Lower, better at low granularities | Higher                                      |
-| Run method                | Almost free runEval                | Expensive (avoid nested runPar calls)p      |
+| Run method                | Almost free =runEval=              | Expensive (avoid nested =runPar= calls)     |
 
 {{{PB}}}
 
