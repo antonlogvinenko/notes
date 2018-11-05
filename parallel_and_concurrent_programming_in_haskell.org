@@ -54,7 +54,7 @@ The main thing to think about in parallel Haskell is *partitioning*:
 
 {{{PB}}}
 
-** Basic Parallelism: the Eval Monad
+** Data Parallelism: the Eval Monad
 *** Lazy Evaluation, Weak Head Normal Form
 Relevant commands:
  - =:sprint= prints value without causing it to be evaluated
@@ -117,7 +117,7 @@ Executable:
  - =+RTS -s= display statistics
  - =-RTS -l= generate log that can be opened with ThreadScope
 
-*** GHC dynamic partitioning
+*** GHC dynamic partitioning, Amdahl's Law
 GHC sparks:
  - =rpar= argument is a *spark*
  - sparks are collected in a pool
@@ -130,7 +130,7 @@ GHC spark can be in following states:
  - *GC'd*: spark was found to be unused by the program
  - *fizzled*: unevaluated when pased to rpar, but evaluated later (dropped from pool)
 
-*** Amdahl's Law
+Amdahl's Law explains how much parallelism is theoretically possible
 *P*: portion of the program that can be parallelized
 
 *N*: number of available processors
@@ -145,7 +145,7 @@ And theoretically possible speedup is:
 \frac{1}{(1-P) + \frac{P}{N}}
 \end{equation}
 
-*** Tools to evaluate in WHNF
+*** WHNF/NF Evaluation
  Evaluate *a* to WHNF, then return *b*
 #+BEGIN_SRC
 seq a b :: a -> b -> b
@@ -155,7 +155,6 @@ seq a b :: a -> b -> b
 evaluate :: a -> IO a
 #+END_SRC
 
-*** Tools to evaluate in NF
 Let's introduce a special class type:
 #+BEGIN_SRC
 class NFData where
@@ -181,16 +180,12 @@ force :: NFData => a -> a
 force x  = x `deepseq` x
 #+END_SRC
 
-*** NF/WHNF summary
-Evaluation to varying degrees is possible:
+We can see that evaluation to varying degrees is possible:
  - *WHNF*, O(1), weak evaluation
  - *NF*, O(n), deep evaluation (traverses the whole structure)
 
 {{{PB}}}
-
-** Evaluation Strategies
-
-*** Strategies
+*** Evaluation Strategies
 Let's define the following type:
 #+BEGIN_SRC
 type Strategy a = a -> Eval a
@@ -321,7 +316,7 @@ do
    ...
 #+END_SRC
 
-*** Practical considerations
+*** Practical considerations of dataflow parallelism
  - *Spark generation* will be likely done on different cores (switching cores)
  - *Granularity*
   - Generate enough work to make CPUs busy
@@ -471,7 +466,7 @@ parMap2 :: NFData a => (a -> b) -> [a] -> Par [IVar b]
 parMap2 f as = mapM (spawn . f) as
 #+END_SRC
 
-*** Pipeline Parallelism & Limiting the Producer
+*** Pipeline Parallelism & Rate-Limiting the Producer
 *Pipeline parallelism* means
 - defining several stages that together form a pipeline
 - each stage defines a single operation applied to all stream elements
@@ -520,6 +515,84 @@ where
             loop t newtail
 #+END_SRC
 
-*** Using Different Schedulers
+Now let's define 2 stages of a pipeline, =encrypt= and =decrypt=:
+#+BEGIN_SRC
+encrypt :: Integer -> Integer -> Strean ByteString -> Par (Stream ByteString)
+encrypt n e s = streamMap (B.pack . show . power e n . code) s
 
-*** Final Comparison of Eval and Par Monads
+decrypt :: Integer -> Integer -> Strean ByteString -> Par (Stream ByteString)
+decrypt n d s = streamMap (B.pack . decode . power d n . integer) s
+#+END_SRC
+
+Then the pipeline will look like this:
+#+BEGIN_SRC
+pipeline :: Integer -> Integer -> Integer -> ByteString -> ByteString
+pipeline n e d b = runPar $ do
+   s0 <- streamFromList (chunk (size n) b)
+   s1 <- encrypt n e s0
+   s2 <- decrypt n d s1
+   xs <- streamFold (\x y -> (y:x)) [] s2
+   return (B.unlines (reverse xs))
+#+END_SRC
+
+Calls to =fork= in 2 =streamMap=, one =streamFromList=, and one =streamFold= calls make stages of pipeline work in parallel.
+
+Two possible problems:
+- if *consumer if much faster than producer* then we might not get enough parallelism
+- but if *producer is much faster than consumer* then the producer might consume a lot of memory
+
+The second problem can be solved by rate-limiting the producer. The general design is as follows:
+- generate some amount of elements *2N*, but delay evaluation after *2N* elements
+- put a rererence to *Par* (that continues evaluation elements of stream after *2N*) after element *N*
+- when consumer consumes *N* elements, it finds saved reference to *Par* and then
+ - consumer triggers evaluation of elements after *2N*
+ - continues consuming second part of already existing *2N* elements while the next *2N* it triggered are being evaluated
+ - the next *2N* elements are evaluated in the same way again, i.e. *N* elements are generated, reference to *Par* is saved, and more *N* elements are generated
+
+The possible type definition:
+#+BEGIN_SRC
+data IList a
+   = Nil
+   | Cons a (IVar (IList a))
+   | Fork (Par ()) (IList a)
+#+END_SRC
+
+*** Using Different Schedulers
+The =Par= monad is implemented as a library, so its behavior can be changed without changing the compilier or runtime system.
+
+For example, it's possible to use a different scheduling strategy. Make this change in all the modules that import =Control.Monad.Par=:
+
+#+BEGIN_SRC
+improt Control.Monad.Par.Scheds.Trace
+   -- instead of Control.Monad.Par
+#+END_SRC
+
+** Comparison of Eval and Par Monads
+|                           | Eval monad with strategies         | Par monad                                   |
+|---------------------------+------------------------------------+---------------------------------------------|
+| Laziness                  | Produces a lazy data structure     | Avoids reliance on lazy evaluation          |
+| Separation from algorithm | Yes                                | No                                          |
+| Composability             | Yes (strategies)                   | Only building a parallel skeleton           |
+| Implementation            | Part of GHC                        | A library, can choose scheduling algorithms |
+| Speculative parallelism   | Yes                                | No (sparks are always executed)             |
+| ThreadScope integration   | Yes                                | No                                          |
+| Overhead                  | Lower, better at low granularities | Higher                                      |
+| Run method                | Almost free runEval                | Expensive (avoid nested runPar calls)p      |
+
+{{{PB}}}
+
+* Concurrent Haskell
+
+** Threads and MVars
+
+*** Threads
+
+*** Mvars
+
+*** MVar as a simple channel
+
+*** MVar as a container for shared state
+
+*** MVar as a Building Block: Unbounded Channels
+
+*** Fairness
