@@ -361,7 +361,14 @@ print $ snd ((1 `div` 0, "Hello!") `using` rdeepseq)
 
 ** Dataflow Pararllelism: The Par Monad
 
-There are important differences between the *Eval* and *Par* monad.
+*Eval* monad allows expressing *data parallelism* which is parallelism between stream elements.
+
+*Par* monad allows expressing:
+ - *dataflow parallelism* which means declaratively defining a *dataflow network* with both independent (parallel) and dependent (graph edges) computations.
+   - *pipeline parallelism*, i.e. parallelism between stages of a pipeline.
+ - *data parallelism* (as in *Eval* monad chapter) as will be shown when we'll define =parMap= and =parMapM=.
+
+There are also other important differences between the *Eval* and *Par* monad.
 
 The *Eval* monad *pros*:
  - Decouples parallelism from algorithm
@@ -402,9 +409,117 @@ Few important notes:
  - =get= operation will block
  - =IVar= instances are intended to be used in the =Par= monad where they were created. Breaking this rule might lead to deadlocks, runtime errors or other bad things.
 
-
 *** Dataflow Parallelism
+Together, =fork= and =IVar= allow the construction of *dataflow networks*. An example:
+#+BEGIN_SRC
+runPar $ do
+   i <- new
+   j <- new
+   fork $ put i (fib n)
+   fork $ put j (fib m)
+   a <- get i
+   b <- get j
+   return $ a + b
+#+END_SRC
+
+We've created a *dataflow graph*:
+- Each =fork= creates a node
+- Each =new= creates and edge
+- =get= and =put= connect the edges of nodes
+
+*** Expressing data parallelism with Par Monad
+Let's first define =spawn= to run computations in parallel and then =parMapM=.
+#+BEGIN_SRC
+spawn :: NFData a => Par a -> Par (IVar a)
+spawn p = do
+   i <- new
+   fork (do x <-p; put i x)
+   return i
+
+parMapM :: NFData b => (a -> Par b) -> [a] -> Par [b]
+parMapM f as = do
+   ibs <- mapM (spawn . f) as
+   mapM get ibs
+#+END_SRC
+
+Note that given following signatures:
+#+BEGIN_SRC
+mapM :: Monad m => (a -> m b) -> [a] -> m [b]
+get  :: IVar a -> Par a
+#+END_SRC
+We can derive that:
+#+BEGIN_SRC
+spawn . f           :: a -> Par (IVar b)
+mapM (spawn . f) as :: Par [IVar b]
+ibs                 :: [IVar b]
+mapM get ibs        :: Par [b]
+#+END_SRC
+
+Note that =parMapM= we defined here uses function that returns =Par=, meaning that *f* itself can add parallelism.
+Now let's implement =parMap= that takes a non-monadic function *f* instead:
+#+BEGIN_SRC
+parMap :: NFData a => (a -> b) -> [a] -> Par [b]
+parMap f as = do
+   ibs <- mapM (spawn . return . f) as
+   mapM get ibs
+#+END_SRC
+The only implementation difference from =parMapM= is =return= in =spawn . return . f= superposition because *f* now returns *b*, not *Par b*.
+
+Both =parMapM= and =parMap= block and wait for results to compute because there's =get= operation in =mapM=. We can define a non-blocking version as
+#+BEGIN_SRC
+parMap2 :: NFData a => (a -> b) -> [a] -> Par [IVar b]
+parMap2 f as = mapM (spawn . f) as
+#+END_SRC
 
 *** Pipeline Parallelism & Limiting the Producer
+*Pipeline parallelism* means
+- defining several stages that together form a pipeline
+- each stage defines a single operation applied to all stream elements
+- stages of pipeline work in parallel (which means that the amount of parallelism is limited)
+
+Let's define *IList* and *Stream* types together with *streamFromList*, *streamFold*, *streamMap* functions:
+#+BEGIN_SRC
+data IList a
+   = Nil
+   | Cons a (IVar (IList a))
+
+type Stream a = IVar (IList a)
+
+streamFromList :: NFData a => [a] -> Par (Stream a)
+streamFromList xs = do
+   var <- new
+   fork $ loop xs var
+   return var
+where
+   loop [] var = put var Nil
+   loop (x:xs) var = do
+      tail <- new
+      put var (Cons x tail)
+      loop xs tail
+
+streamFold :: (a -> b -> a) -> a -> Stream b -> Par a
+streamFold fn !acc instrm = do
+   ilist <- get instrim
+   case ilist of
+      Nil      -> return acc
+      Cons h t -> streamFold fn (fn acc h) t
+
+streamMap :: NFData b => (a -> b) -> Stream a -> Par (Stream b)
+streamMap fn instream = do
+   outstream <- new
+   fork $ loop instream outstream
+   return outstream
+where
+   loop instream outstream = do
+      ilsit <- get instream
+      case ilist of
+         Nil -> put outstream Nil
+         Cons h t -> do
+            newtail <- new
+            put outstream $ Cons (fn h) newtail
+            loop t newtail
+#+END_SRC
 
 *** Using Different Schedulers
+
+*** Final Comparison of Eval and Par Monads
