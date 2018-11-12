@@ -586,8 +586,6 @@ improt Control.Monad.Par.Scheds.Trace
 ** Threads and MVars
 
 *** Threads
-
-*** Mvars
 #+BEGIN_SRC
 forkIO :: IO () -> IO ThreadId
 #+END_SRC
@@ -599,8 +597,7 @@ The program terminaes when =main= returns even if there are threads running.
 This is the simples possible solution,
 since waiting for all threads can be implemented on top of it.
 
-*** MVar as a simple channele
-
+*** Mvars
 #+BEGIN_SRC
 data MVar a
 
@@ -621,6 +618,8 @@ putMVar      :: MVar a -> IO ()
  - Putting the value with =putMVar= is *releasing the lock*
  - For external resources (foreign code, filesystem, etc.) dummy value () in =MVar= may be used to turn =putMVar= and =takeMVar= into operations for controlling access to these resources
 - *Building block* for constructing larger data structures
+
+*** MVar as a simple channel
 
 *** MVar as a simple channel: A Logging Service
 #+BEGIN_SRC
