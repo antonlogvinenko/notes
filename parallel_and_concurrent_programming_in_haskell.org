@@ -588,9 +588,77 @@ improt Control.Monad.Par.Scheds.Trace
 *** Threads
 
 *** Mvars
+#+BEGIN_SRC
+forkIO :: IO () -> IO ThreadId
+#+END_SRC
 
-*** MVar as a simple channel
+Threads may contend for a resource (stdout Handle for instance),
+so their behavior is affected by how contention is managed by RTS.
 
+The program terminaes when =main= returns even if there are threads running.
+This is the simples possible solution,
+since waiting for all threads can be implemented on top of it.
+
+*** MVar as a simple channele
+
+#+BEGIN_SRC
+data MVar a
+
+newEmptyMVar :: IO (MVar a)
+newMVar      :: a -> IO (MVar a)
+takeMVar     :: MVar a -> IO a
+putMVar      :: MVar a -> IO ()
+#+END_SRC
+
+=takeMVar= blocks if =MVar= is empty.
+=putMVar= blocks if =MVar= is not empty.
+
+=MVar= roles:
+- *One place channel*: passing messages between threads, holding one message a time.
+- *Container for shared mutable state*
+ - Mutable data can be stored in =MVar=
+ - Taking =MVar= is *acquiring the lock*
+ - Putting the value with =putMVar= is *releasing the lock*
+ - For external resources (foreign code, filesystem, etc.) dummy value () in =MVar= may be used to turn =putMVar= and =takeMVar= into operations for controlling access to these resources
+- *Building block* for constructing larger data structures
+
+*** MVar as a simple channel: A Logging Service
+#+BEGIN_SRC
+data Logger = Logger (MVar Log Channel)
+
+;;MVar in Stop: call takeMVar on it to block
+;;until Logging service allows to unblock with putMVar
+data LogCommand = Message String 
+                | Stop (MVar ())
+
+initLogger :: IO Logger
+initLogger = do
+   m < newEmptyVar
+   let l = Logger m
+   forkIO (logger l)
+
+logger :: Logger -> IO ()
+logger (Logger m) = loop
+   where
+      loop = do
+         cmd <- takeMVar m
+         case cmd of
+            Message msg -> do
+               putStrLn msg
+               loop
+            Stop s -> do
+               putStrLn "logger: stop"
+               putMVar s ()
+
+logMessage :: Logger -> String -> IO()
+logMessage (Loger m) s = putMVar s (Message s)
+
+logStop :: Logger -> IO ()
+logStop (Logger m) = do
+   s <- newEmptyMVar
+   putMVar m (Stop s)
+   takeMvar s
+#+END_SRC
 *** MVar as a container for shared state
 
 *** MVar as a Building Block: Unbounded Channels
