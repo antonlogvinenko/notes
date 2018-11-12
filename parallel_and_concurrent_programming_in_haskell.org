@@ -620,8 +620,6 @@ putMVar      :: MVar a -> IO ()
 - *Building block* for constructing larger data structures
 
 *** MVar as a simple channel
-
-*** MVar as a simple channel: A Logging Service
 #+BEGIN_SRC
 data Logger = Logger (MVar Log Channel)
 
@@ -658,6 +656,10 @@ logStop (Logger m) = do
    putMVar m (Stop s)
    takeMvar s
 #+END_SRC
+
+*** MVar as a simple channel: A Logging Service
+
+
 *** MVar as a container for shared state
 
 *** MVar as a Building Block: Unbounded Channels
