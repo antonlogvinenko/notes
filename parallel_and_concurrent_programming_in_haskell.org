@@ -619,7 +619,7 @@ putMVar      :: MVar a -> IO ()
  - For external resources (foreign code, filesystem, etc.) dummy value () in =MVar= may be used to turn =putMVar= and =takeMVar= into operations for controlling access to these resources
 - *Building block* for constructing larger data structures
 
-*** MVar as a simple channel
+*** MVar as a simple channel: A Logging Service
 #+BEGIN_SRC
 data Logger = Logger (MVar Log Channel)
 
@@ -656,9 +656,6 @@ logStop (Logger m) = do
    putMVar m (Stop s)
    takeMvar s
 #+END_SRC
-
-*** MVar as a simple channel: A Logging Service
-
 
 *** MVar as a container for shared state
 
