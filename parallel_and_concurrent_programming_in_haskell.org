@@ -658,7 +658,49 @@ logStop (Logger m) = do
 #+END_SRC
 
 *** MVar as a container for shared state
+#+BEGIN_SRC
+type Name = String
+type PhoneNumber = String
+type PhoneBook = Map Name PhoneNumber
+newtype PhoneBookState = PhoneBookState (MVar PhoneBook)
 
+new :: IO PhoneBookState
+new = do
+   m <- newMVar Map.empty
+   return $ PhoneBookState m
+
+insert :: PhoneBookState -> Name -> PhoneNumber -> IO ()
+insert (PhoneBookState m) name number = do
+   book <- takeMVar m
+   putMVar m $ Map.insert name number book   ;; (2)
+
+lookup :: PhoneBookState -> Name -> IO (Maybe PhoneNumber)
+lookup (PhoneBookState m) name = do
+   book <- takeMVar m
+   putMVar m book                 ;; (1)
+   return $ Map.lookup name book
+#+END_SRC
+
+Important notes:
+- In *(1)*, complex lookup operation happens outside of take/pub lock: the lock isn't held too long.
+- In *(2)*, =Map.insert= is lazy, this has 2 consequences:
+ - Lock isn't being held for too long
+ - But changes may build up (unevaluated)
+There are two possible ways we can fix problem with *(2)*. First, we can use =$!= operator.
+#+BEGIN_SRC
+putMVar m $! Map.insert name number book
+#+END_SRC
+This reverses properties of the original solution:
+- Lock is held until operation completes
+- Changes (unevaled) can't build up
+The second approach is to use =seq= to force evaluation of new *book state* after updating *MVar*:
+#+BEGIN_SRC
+let book' = Map.insert name number book
+putMVar m book'
+seq book' (return ())
+Now the lock is held briefly, unevaluated changes don't build up.
+
+#+ENd_SRC
 *** MVar as a Building Block: Unbounded Channels
 
 *** Fairness
