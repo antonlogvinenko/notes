@@ -682,7 +682,7 @@ lookup (PhoneBookState m) name = do
 #+END_SRC
 
 Important notes:
-- In *(1)*, complex lookup operation happens outside of take/pub lock: the lock isn't held too long.
+- In *(1)*, complex lookup operation happens outside of take/put lock: the lock isn't held too long.
 - In *(2)*, =Map.insert= is lazy, this has 2 consequences:
  - Lock isn't being held for too long
  - But changes may build up (unevaluated)
@@ -691,16 +691,62 @@ There are two possible ways we can fix problem with *(2)*. First, we can use =$!
 putMVar m $! Map.insert name number book
 #+END_SRC
 This reverses properties of the original solution:
-- Lock is held until operation completes
+- Lock is held until operation completes (too long)
 - Changes (unevaled) can't build up
 The second approach is to use =seq= to force evaluation of new *book state* after updating *MVar*:
 #+BEGIN_SRC
 let book' = Map.insert name number book
 putMVar m book'
 seq book' (return ())
-Now the lock is held briefly, unevaluated changes don't build up.
-
 #+ENd_SRC
+Now the lock is held briefly, unevaluated changes don't build up.
 *** MVar as a Building Block: Unbounded Channels
+#+BEGIN_SRC
+data Chan a = Chan (MVar (Stream a)) (MVar (Stream a))
+data Stream a = MVar (Item a)
+data Item a = Item a (Stream a)
+
+#+END_SRC
+
+#+BEGIN_SRC
++-------+
+| h | t | Channel
++-------+
+  |    |
++---+ +---+
+| S | | S |---------------------------------------
++---+ +---+                                       |
+  |                                               |
++--+  +------+  +--+  +------+  +--+  +------+  +--+
+|  |->| Item |->|  |->| Item |->|  |->| Item |->|  |
++--+  +------+  +--+  +------+  +--+  +------+  +--+
+Read  1st             2nd             3rd       Write
+end   value           value           value     end
+
+newChan :: IO (Chan a)
+newChan = do
+   hole     <- newEmptyVar
+   readVar  <- newMVar hole
+   writeVar <- newMVar hole
+   return $ Chan readVar writeVar
+
+writeChan :: Chane a -> a -> IO ()
+writeChan (Chan _ writeVar) val = do
+   newHole <- newEmptyVar
+   oldHole <- takeMVar writeVar         ;; (1)
+   putMVar oldHole $ Item val newHole   ;; (2)
+   putMVar writeVar newHole
+
+readChan :: Chan a -> IO a
+readChan (Chan readVar _) = do
+   stream <- takeMVar readVar           ;; (3)
+   Item val tail <- takeMVar stream     ;; (4)
+   putMVar readVar tail
+   return val
+#+END_SRC
+
+Several rules:
+- From =(1)= and =(3)= follows that all *writes* are independent from *reads*, if the channel is not empty.
+ - If the stream is empty a *write* blocks until *read* happens (see 
 
 *** Fairness
