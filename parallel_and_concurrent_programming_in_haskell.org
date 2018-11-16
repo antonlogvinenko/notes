@@ -290,7 +290,7 @@ where
                   go xs
 #+END_SRC
 
-Impotant thing to note is that in =parList1= we're building a new list. It might look like we might just generate sparks that would evaluate list items in parallel, as we did in =parList2=.
+Improtant thing to note is that in =parList1= we're building a new list. It might look like we might just generate sparks that would evaluate list items in parallel, as we did in =parList2=.
 But this assumption is not true: if we only generate sparks, then only pool will reference them and they would be GC'd, i.e. we'd witness *speculative parallelism*.
 Since we don't want it in this particular case, we need to have something else to reference sparks, hence building the resulting list: =parList1= is the correct implementation, =parList2= is not.
 
@@ -745,8 +745,36 @@ readChan (Chan readVar _) = do
    return val
 #+END_SRC
 
-Several rules:
+*Several rules:*
 - From =(1)= and =(3)= follows that all *writes* are independent from *reads*, if the channel is not empty.
- - If the stream is empty a *write* blocks until *read* happens (see 
+- If the channel is empty, then *read* will block on =takeMVar= in =(4)= until a *write* occurs and unblocks =MVar= on =(2)=
+- Every *write* blocks every other *write* (see =(1)=), every *read* blocks every other *read* (see =(3)=)
+
+*Let's try to implement* =dupChannel= that allows to write to one channel, but read written value from both channels.
+The idea: single common write end, but separate read ends.
+The result of =dupChan= is a new channel that:
+- uses the same =MVar= to track the last written value, so that both channel write to the end of the same stream
+- but has a different =MVar= to track the read end, so that if a value is read from one channel, it still can be read from another
+
+#+BEGIN_SRC
+dupChan :: Chan a -> IO (Chan a)
+dupChan (Chan _ writeVar) = do
+   hole       <- readMVar writeVar
+   newReadVar <- newMVar hole
+   return     $  Chan newReadVar writeVar
+#+END_SRC
+*There's a problem* with this implementation:
+in =(4)=, =readChan= takes value from =MVar= but doesn't put it back, thus destroying a link to the first =Item= from stream's =MVar=.
+This means that when a value is read from duplicate channel, the reading thread will block on the empty =MVar=.
+
+*The problem can be fixed* by replacing =takeMVar= with =readMVar= in =readChan= in =(4)=:
+#+BEGIN_SRC
+readChan :: Chan a -> IO a
+readChan (Chan readVar _) = do
+   stream <- takeMVar readVar
+   Item val tail <- readMVar stream     ;; (4)
+   putMVar readVar tail
+   return val
+#+END_SRC
 
 *** Fairness
