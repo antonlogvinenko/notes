@@ -767,14 +767,46 @@ dupChan (Chan _ writeVar) = do
 in =(4)=, =readChan= takes value from =MVar= but doesn't put it back, thus destroying a link to the first =Item= from stream's =MVar=.
 This means that when a value is read from duplicate channel, the reading thread will block on the empty =MVar=.
 
+For example, here *read end 1* of one channel was read and it now points to *M2 MVar*, and the link from *M1* to *V1* was destroyed by =takeMVar=.
+Now if a thread tries to read a value from another channel via *read end 2*, it will block indefinitely.
+#+BEGIN_SRC
++-------+
+| read  |
+| end 1 |-------------------------
++-------+                         |
+                                  |
++-------+                         |
+| read  |    +----+    +----+    +----+    +----+    +----+
+| end 2 |--->| M1 |-X->| V1 |--->| M2 |--->| V2 |--->| M3 |---> ...
++-------+    +----+    +----+    +----+    +----+    +----+
+#+END_SRC
+
 *The problem can be fixed* by replacing =takeMVar= with =readMVar= in =readChan= in =(4)=:
 #+BEGIN_SRC
 readChan :: Chan a -> IO a
 readChan (Chan readVar _) = do
    stream <- takeMVar readVar
-   Item val tail <- readMVar stream     ;; (4)
+   Item val tail <- readMVar stream
    putMVar readVar tail
    return val
 #+END_SRC
+
+*Let's try to implement unGetChan*. The idea is to write to the read end (what could possibly go wrong?).
+#+BEGIN_SRC
+unGetChan :: Chan a -> a -> IO ()
+unGetChan (Chan readVar _) val = do
+   newReadEnd <- newEmptyMVar
+   readEnd <- takeMVar readVar            ;; (5)
+   putMVar newReadEnd (Item val readEnd)
+   putMVar readVar newReadEnd
+#+END_SRC
+
+*There's a problem with this implementation*. If:
+- the channel is empty
+- and there's a =readChan= blocked on =takeMVar= because it's empty (see =(3)=)
+then =unGetChan= will block on =takeMVar= on the same =MVar= as =readChan= (see =(5)=), and the value won't be written.
+
+In other words, absence of value will block =readChan=,
+but the following =unGetChan= won't be able to deliver the value and unblock =readChan= since it's blocked by the =readChan= itself. Deadlock.
 
 *** Fairness
