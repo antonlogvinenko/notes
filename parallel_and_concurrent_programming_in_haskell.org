@@ -14,6 +14,12 @@ This is a summary of Simon Marlow's book [[https://simonmar.github.io/pages/pcph
 
 Free online version is available [[https://www.oreilly.com/library/view/parallel-and-concurrent/9781449335939/][here]].
 
+An =*.org= file containing sources of this document can be found [[https://github.com/antonlogvinenko/notes/blob/master/parallel_and_concurrent_programming_in_haskell.org][here]].
+
+This book doesn't cover following topics:
+- parallel programming with Repa and Accelerate
+- distributed programming
+
 
 {{{PB}}}
 
@@ -823,3 +829,15 @@ but the following =unGetChan= won't be able to deliver the value and unblock =re
  - only one of the threads becomes unblocked, aka *single wakeup* proeprty that is an important performance characteristic when a large amount of threads are contending for a single =MVar=
 
 These guarantees, *fairness guarantee* & *single wakeup* keep =MVar= from being completely subsumed by =STM=.
+
+{{{PB}}}
+
+** Synchronous Exceptions: Overlapping Input/Output
+
+** Asynchronous Exceptions: Cancellation and Timeouts
+
+** Software Transactional Memory
+
+** Higher Level Concurrency Abstractions
+
+** Debugging, Tuning, and Interfacing with Foreign Code
