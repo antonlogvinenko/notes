@@ -834,10 +834,127 @@ These guarantees, *fairness guarantee* & *single wakeup* keep =MVar= from being 
 
 ** Synchronous Exceptions: Overlapping Input/Output
 
+*** Async data type
+Let's define =Async= data type:
+#+BEGIN_SRC
+data Async a = Async (MVar a)
+
+async :: IO a -> IO (Async a)
+async action = do
+   var <- newEmptyMVar
+   forkIO $ do r <- action; putMVar var r
+   return $ Async var
+
+wait :: Async a -> IO a
+wait (Async var) = readMVar var
+#+END_SRC
+Using =readMVar=, not =takeMVar=, because there might be multiple waiters of this =Async=.
+
+Example:
+#+BEGIN_SRC
+getURL :: String -> IO ByteString
+getURL url = ...
+
+timeDownload :: String -> IO ()
+timeDownload url = do
+   (page, time) <- timeit $ getURL url
+   print "downloaded..."
+
+sites = ["http://google.com", ...]
+
+main = do
+   as <- mapM (async . timeDownload) sites
+   mapM_ wait as
+#+END_SRC
+
+*** Exceptions in Haskell
+
+**** Definition
+
+#+BEGIN_SRC
+class (Typeable e, Show e) => Exception e where ...
+#+END_SRC
+
+**** Throwing
+
+***** From anywhere
+
+=throw= return an unrestricted type variable =a=:
+#+BEGIN_SRC
+throw :: Exception e => e -> a
+#+END_SRC
+
+Or:
+
+#+BEGIN_SRC
+error :: String -> a
+error s = throw (ErrorCall s)
+#+END_SRC
+
+***** From IO
+
+#+BEGIN_SRC
+throwIO :: Exception e => a -> IO a
+#+END_SRC
+
+**** Catching
+
+***** Catching and transforming
+
+#+BEGIN_SRC
+try :: Exception e => IO a -> IO (Either e a)
+#+END_SRC
+
+***** Catching and resource management
+****** =onException=
+
+Do the first action. If exception, do the second & rethrow exception
+#+BEGIN_SRC
+onException :: IO a -> IO b -> IO a
+#+END_SRC
+
+****** =bracket=
+
+Defeines how to acquire resource (=before= action), what to do with it (=during= action), and how to release it (=after= action).
+
+Release of resource is performed if the resource was acquired, whether the =during= action completed normally or abnormally via exception.
+
+If =during= action completed with an exception, then the exception is rethrown.
+#+BEGIN_SRC
+bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+bracket before after during = do
+   a <- before
+   c <- during a `onException` after a
+   after a
+   return c
+#+END_SRC
+
+****** =finally=
+
+Perform the =io= action. Then perform the =after= action whether the =io= action completed normally or via exception.
+
+If =io= action generated an exception, then the exception is rethrown.
+
+#+BEGIN_SRC
+finally :: IO a -> IO b -> IO a
+finally io after = do
+   io `onException` after
+   after
+#+END_SRC
+
+{{{PB}}}
+
 ** Asynchronous Exceptions: Cancellation and Timeouts
+
+
+{{{PB}}}
 
 ** Software Transactional Memory
 
+{{{PB}}}
+
 ** Higher Level Concurrency Abstractions
+
+{{{PB}}}
 
 ** Debugging, Tuning, and Interfacing with Foreign Code
