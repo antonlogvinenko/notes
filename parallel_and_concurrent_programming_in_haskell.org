@@ -942,8 +942,57 @@ finally io after = do
    after
 #+END_SRC
 
-{{{PB}}}
+*** Error Handling in Async
 
+**** Redefining =Async= to include error information
+
+#+BEGIN_SRC
+data Async a = Async (MVar (Either SomeException a))
+
+async action = do
+   var <- newEmptyVar
+   forkIO $ do r <- try action; putMVar var r
+   return $ Async var
+#+END_SRC
+
+**** =waitCatch=
+#+BEGIN_SRC
+waitCatch :: Async a -> IO (Either SomeException a)
+waitCatch (Async a) = readMVar a
+#+END_SRC
+
+**** =wait=
+#+BEGIN_SRC
+wait :: Async a -> IO a
+wait a = do
+   r <- waitCatch a
+   case r of
+      Left e -> throwIO e
+      Right a -> return a
+#+END_SRC
+
+**** =waitEither=
+#+BEGIN_SRC
+waitEither :: Async a -> Async b -> IO (Either a b)
+waitEither a b = do
+   m <- newEmptyMVar
+   forkIO $ do r <- try (fmap Left  (wait a)); putMVar m r
+   forkIO $ do r <- try (fmap Right (wait b)); putMVar m r
+   wait (Async m)
+#+END_SRC
+
+**** =waitAny=
+
+#+BEGIN_SRC
+waitAny :: [Async a] -> IO a
+waitAny as = do
+   m <- newEmptyMVar
+   let forkwait a = forkIO $ do r <- try (wait a); putMVar m r
+   mapM_ forkwait as
+   wait (Async m)
+#+END_SRC
+
+{{{PB}}}
 ** Asynchronous Exceptions: Cancellation and Timeouts
 
 
