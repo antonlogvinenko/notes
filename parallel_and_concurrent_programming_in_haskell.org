@@ -701,6 +701,8 @@ seq book' (return ())
 #+ENd_SRC
 Now the lock is held briefly, unevaluated changes don't build up.
 *** MVar as a Building Block: Unbounded Channels
+**** Implementing an unbounded channel
+
 #+BEGIN_SRC
 data Chan a = Chan (MVar (Stream a)) (MVar (Stream a))
 data Stream a = MVar (Item a)
@@ -750,7 +752,9 @@ readChan (Chan readVar _) = do
 - If the channel is empty, then *read* will block on =takeMVar= in =(4)= until a *write* occurs and unblocks =MVar= on =(2)=
 - Every *write* blocks every other *write* (see =(1)=), every *read* blocks every other *read* (see =(3)=)
 
-*Let's try to implement* =dupChannel= that allows to write to one channel, but read written value from both channels.
+**** Implementing dupChannel
+
+Let's try to implement =dupChannel= that allows to write to one channel, but read written value from both channels.
 The idea: single common write end, but separate read ends.
 The result of =dupChan= is a new channel that:
 - uses the same =MVar= to track the last written value, so that both channel write to the end of the same stream
@@ -791,6 +795,8 @@ readChan (Chan readVar _) = do
    return val
 #+END_SRC
 
+**** Implementing unGetChan
+
 *Let's try to implement unGetChan*. The idea is to write to the read end (what could possibly go wrong?).
 #+BEGIN_SRC
 unGetChan :: Chan a -> a -> IO ()
@@ -810,3 +816,10 @@ In other words, absence of value will block =readChan=,
 but the following =unGetChan= won't be able to deliver the value and unblock =readChan= since it's blocked by the =readChan= itself. Deadlock.
 
 *** Fairness
+
+- If =MVar= is held 100% of the time then we can't guarantee anything
+- But if it's not held indefinitely, then:
+ - thread in the list of blocked threads will *wake up* & *acquire* =MVar= with =takeMVar= atomically, i.e. *no thread is blocked indefinitely* aka *fairness guarantee*
+ - only one of the threads becomes unblocked, aka *single wakeup* proeprty that is an important performance characteristic when a large amount of threads are contending for a single =MVar=
+
+These guarantees, *fairness guarantee* & *single wakeup* keep =MVar= from being completely subsumed by =STM=.
