@@ -1017,7 +1017,7 @@ This is why Haskell uses the second approach
 - but you can fall back to polling for critical sections
 
 To summarise, there are 2 types of exceptions in Haskell:
-- an exception from a function like =openFile[ when the file doesn't exist --- *synchronous exceptions* (synchronous from the point of view of the victim thread)
+- an exception from a function like =openFile= when the file doesn't exist --- *synchronous exceptions* (synchronous from the point of view of the victim thread)
 - an exception that may arise an any time (because the user pressed the stop button) --- *asynchronous exceptions* (synchronous from the point of view of the victim thread)
 
 *** Asynchronous Exceptions: Throwing
@@ -1117,6 +1117,56 @@ Being in *polling mode* means:
 - For *functions that can block*, like =putMVar= and =takeMVar=, it means that *if they actually block* then *they will respond* to a *polled asynchronous exception* if one occurs and *will throw it as a synchronous exception*.
 
 *** Asynchronous Exceptions: Higher Level Abstractions
+
+There are several more functions useful for working with asynchronous exceptions
+
+**** =uninterruptibleMask=
+
+There's a special version of =mask= that allows to hide asynchronous exceptions even from interruptible functions.
+
+- If you mask async exceptions with =uninteruptibleMask= then all blocking operations won't poll an asynchronous exception when one happens.
+- Hence the use of it must be treated with utmost suspicious
+
+#+BEGIN_SRC
+uninterruptibleMask :: ((IO a -> IO a) -> IO b) -> IO b
+#+END_SRC
+
+**** =getMaskingState=
+
+It's possible to get current masking state for debugging purposes:
+#+BEGIN_SRC
+data MaskingState = Unmasked
+                   | MaskedInterruptible
+                   | MaskedUninterruptible
+
+getMaskingState :: MaskingState
+#+END_SRC
+
+**** =modifyMVar=, =modifyMVar_=
+
+Two following functions are intended to insulate the programmer from the need to mask directly:
+
+#+BEGIN_SRC
+modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
+modifyMVar  :: MVar a -> (a -> IO (a, b)) -> IO b
+#+END_sRC
+
+Example:
+#+BEGIN_SRC
+modifyTwo :: MVar a -> MVar b -> (a -> b -> IO (a, b)) -> IO ()
+modifyTwo ma mb = do
+   modifyMVar_ mb $ \b ->           ;; (1)
+      modifyMVar ma $ \a -> f a b   ;; (2)
+#+END_SRC
+
+Read =(2)= first, then read =(1)= to verify that the implementation does what it intended to.
+
+We always know that both =modifyMVar= and =modifyMVar_= either apply changes or rethrow an exception. Hence only two scenarios are possible:
+- Either =f a b= throws an exception (sync or async) when evaluated inside =(2)=. Then first =(2)= and after it =(1)= will restore original values of =MVars=.
+- Or =f a b= completes normally, in which case =ma= gets updated, then =mb= gets updated
+
+**** =bracket=
+
 
 *** forkIO and Masking Asynchronous Exceptions
 
