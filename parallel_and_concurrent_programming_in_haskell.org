@@ -1012,13 +1012,109 @@ In Haskell:
 - most of the code is *purely functional*, so it *can be safely aborted/suspended/resumed* without affecting correctness, so interruption of another thread is performed via asynchronous exceptions by default
 - most code is *purely functional*, so we *can't actually poll* for the cancellation timeouts
 
-This is why Haskell uses the second approach:
+This is why Haskell uses the second approach
 - threads are immediately cancelled by default
 - but you can fall back to polling for critical sections
 
+To summarise, there are 2 types of exceptions in Haskell:
+- an exception from a function like =openFile[ when the file doesn't exist --- *synchronous exceptions* (synchronous from the point of view of the victim thread)
+- an exception that may arise an any time (because the user pressed the stop button) --- *asynchronous exceptions* (synchronous from the point of view of the victim thread)
+
 *** Asynchronous Exceptions: Throwing
+#+BEGIN_SRC
+throwTo :: Exception e => ThreadId -> e -> IO ()
+#+END_SRC
+
+An example:
+#+BEGIN_SRC
+data Async a = Async ThreadId (MVar (Either SomeException a))
+
+cancel :: Async a -> IO ()
+cancel (Async t var) = throwTo t ThreadKilled
+
+async :: IO () -> IO (Async a)
+async action = do
+   m <- newEmptyMVar
+   t <- forkIO $ do r <- try action; putMVar m r
+   return $ Async t m
+
+main = do
+   as <- mapM (async . timeDownload) sites
+   forkIO $ do
+      hSetBuffering stdin NoBuffering
+      forever $ do
+         c <- getChar
+         when (c == 'q') $ mapM_ cancel as
+   rs <- mapM waitCatch as
+   printf "%d/%d succeeded\n" (length (rights rs)) (length rs)
+#+END_SRC
+
 
 *** Asynchronous Exceptions: Catching, Masking, and Unmasking
+
+General problem: an asynchronous exception might be delivered in the middle of operation of updating shared state.
+Here's an example:
+#+BEGIN_SRC
+problem :: MVar a -> (a -> IO a) -> IO ()
+problem m f = do
+   a <- takeMVar m                                 ;; (1)
+   r < f a `catch` \e -> do putMVar m a; throw e   ;; (2)
+   putMVar m r                                     ;; (3)
+#+END_SRC
+
+Locating the problem in this example:
+- if =(1)= succeeds, and an async exception is thrown between =(1)= and =(2)=
+- if =(1)= and =(2)= succeed, and an async exception is thrown between =(2)= and =(3)=
+then the async exception will prevent =putMVar= in =(3)= from updating the shared =MVar=.
+
+Let's solve this problem incrementally.
+
+**** *Masking* (disabling) asynchronous exceptions for a region of code
+
+Function =mask= lets us mask (disable, or switch to polling to be precise) asynchronous exceptions.
+#+BEGIN_SRC
+mask :: ((IO a -> IO a) -> IO b) -> IO b
+#+END_SRC
+
+We pass it some function =f= of type =(IO a -> IO a) -> IO b= that will receive a function =restore= of type =IO a -> IO a= as its first argument to unmask the exceptions.
+
+Updated =problem= implementation looks like this:
+#+BEGIN_SRC
+problem :: MVar a -> (a -> IO a) -> IO ()
+problem m f = mask $ \restore -> do
+   a <- takeMVar m
+   r <- restore (f a) `catch` \e -> do putMVar m a; throw e
+   putMVar m r
+#+END_SRC
+
+We solved a part of the problem: async exceptions can now be delivered only in =restore (f a)=.
+
+**** Ensure *blocking operations still respond* to masked asynchronous exceptions
+
+The next problem is that =takeMVar= in =(1)= might block indefinitely & be unresponsive to asynchronous exceptions.
+
+Solution: all blocking operations, like =putMVar= and =takeMVar=, are *interruptible* in Haskell:
+- inside =mask= we're in polling mode
+- if an operation actually blocks
+then an *interruptible* function will throw an asynchronous exception as a synchronous exception.
+
+The problem is hence solved: =takeMVar= will not block indefinitely.
+
+**** But *not all blocking operations should respond* to asynchronous exceptions inside =mask=
+
+The next problem is that we don't really want the =putMVar= in =(4)= to respond to a possible asynchronous exception.
+This would leave shared =MVar= empty which is not the intended behavior of this code.
+
+This can be solved only by operating on every =MVar= in a consistent way: first call =takeMVar=, then update it with =putMVar=.
+Since we always call =takeMVar= on the =MVar= first, the =MVar= is guaranteed to be empty when we call =putMVar=, which means the =putMVar= is guarantee to not block, and since it doesn't block it will never respond to asynchronous exceptions.
+
+**** Summary
+
+We introduced =mask= that switches execution to *polling mode*, and =restore= that switches the mode back.
+
+Being in *polling mode* means:
+- For *most of the code*, being inside =mask= and hence switching to *polling mode* means that an asynchronous exception won't interrupt the execution.
+- For *functions that can block*, like =putMVar= and =takeMVar=, it means that *if they actually block* then *they will respond* to a *polled asynchronous exception* if one occurs and *will throw it as a synchronous exception*.
 
 *** Asynchronous Exceptions: Higher Level Abstractions
 
