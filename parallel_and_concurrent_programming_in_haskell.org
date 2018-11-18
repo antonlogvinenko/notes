@@ -995,6 +995,34 @@ waitAny as = do
 {{{PB}}}
 ** Asynchronous Exceptions: Cancellation and Timeouts
 
+*** Asynchronous Exceptions: Motivation
+
+It's important to have an ability to interrupt the execution of another thread
+after the occurence of some particular condition.
+
+There are 2 ways to implement it:
+- the thread has *to poll* for the cancellation condition
+ - the programmer may forget to poll (or to poll regularly enough), and the thread will become unresponsive
+- the thread is *immediately cancelled* in some way
+ - critical sections that modify state need to be protected from cancellation (via first option, *polling*), otherwize cancellation may leave data in an unconsistent state
+
+In most imperative languages, first option is the default behaviour because a lot of code modifies state.
+
+In Haskell:
+- most of the code is *purely functional*, so it *can be safely aborted/suspended/resumed* without affecting correctness, so interruption of another thread is performed via asynchronous exceptions by default
+- most code is *purely functional*, so we *can't actually poll* for the cancellation timeouts
+
+This is why Haskell uses the second approach:
+- threads are immediately cancelled by default
+- but you can fall back to polling for critical sections
+
+*** Asynchronous Exceptions: Throwing
+
+*** Asynchronous Exceptions: Catching, Masking, and Unmasking
+
+*** Asynchronous Exceptions: Higher Level Abstractions
+
+*** forkIO and Masking Asynchronous Exceptions
 
 {{{PB}}}
 
