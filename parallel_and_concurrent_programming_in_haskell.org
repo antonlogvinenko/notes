@@ -995,7 +995,7 @@ waitAny as = do
 {{{PB}}}
 ** Asynchronous Exceptions: Cancellation and Timeouts
 
-*** Asynchronous Exceptions: Motivation
+*** Motivation
 
 It's important to have an ability to interrupt the execution of another thread
 after the occurence of some particular condition.
@@ -1020,7 +1020,7 @@ To summarise, there are 2 types of exceptions in Haskell:
 - an exception from a function like =openFile= when the file doesn't exist --- *synchronous exceptions* (synchronous from the point of view of the victim thread)
 - an exception that may arise an any time (because the user pressed the stop button) --- *asynchronous exceptions* (synchronous from the point of view of the victim thread)
 
-*** Asynchronous Exceptions: Throwing
+*** Throwing
 #+BEGIN_SRC
 throwTo :: Exception e => ThreadId -> e -> IO ()
 #+END_SRC
@@ -1050,7 +1050,7 @@ main = do
 #+END_SRC
 
 
-*** Asynchronous Exceptions: Catching, Masking, and Unmasking
+*** Catching, Masking, and Unmasking
 
 General problem: an asynchronous exception might be delivered in the middle of operation of updating shared state.
 Here's an example:
@@ -1116,7 +1116,7 @@ Being in *polling mode* means:
 - For *most of the code*, being inside =mask= and hence switching to *polling mode* means that an asynchronous exception won't interrupt the execution.
 - For *functions that can block*, like =putMVar= and =takeMVar=, it means that *if they actually block* then *they will respond* to a *polled asynchronous exception* if one occurs and *will throw it as a synchronous exception*.
 
-*** Asynchronous Exceptions: Higher Level Abstractions
+*** Higher Level Abstractions
 
 There are several more functions useful for working with asynchronous exceptions
 
@@ -1167,8 +1167,70 @@ We always know that both =modifyMVar= and =modifyMVar_= either apply changes or 
 
 **** =bracket=
 
+#+BEGIN_SRC
+bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+bracket before after thing =
+   mask $ \restore -> do
+      a <- before
+      r <- restore (thing a) `onException` after a
+      _ <- after a
+      return r
+#+END_SRC
 
-*** forkIO and Masking Asynchronous Exceptions
+There are two important characteristics of this utility:
+- If =before= returns then =after= is guaranteed to be executed in the future
+- =before= is allowed to contain only one blocking operation
+ - if there's only one blocking operation in =before=, and it becomes blocked, and an asynchronous exception occurs then no harm is done: nothing was acquired, nothing needs to be released, the exception is simply rethrown
+ - if there are two blocking operations in =before=, the first one succeeds, the second one blocks and detects an asynchronous exceptions, then the exception is rethrown, and possible harm has been done: the result of first blocking operation can't be undone!
+
+*** Asynchronous exceptions in exception handlers
+
+Haskell *utomatically masks asynchronous exceptions in exception handlers*:
+- we don't want a cleanup to be interrupted
+- but it's easy to accidentally remain inside the implicit mask
+
+*** forkIO and Masking
+
+An example:
+#+BEGIN_SRC
+async :: IO a -> IO (Async a)
+async action = do
+   m <- newEMptyMVar
+   t <- forkIO $ do r < try action; putMVar m r
+   return $ Async t m
+#+END_SRC
+
+The problem: if =Async= is cancelled then an exception may strike:
+- after =try= & before =putMVar=
+- before =try=
+- even before =mask= if we wrap =forkIO= contents with it
+
+Solution: *=forkIO= inherits mask state*. Now we can write:
+#+BEGIN_SRC
+async :: IO a -> IO (Async a)
+async action = do
+   m <- newEmptyMVar
+   t <- mask $ \restore ->
+      forkIO $ do r <- try (restore action); putMVar m r
+   return $ Async t m
+#+END_SRC
+
+Also, since it's a common pattern, it's called =forkFinally=:
+#+BEGIN_SRC
+forkFinally :: IO a -> (Either SomeException a -> IO ()) -> IO ThreadId
+forkFinally action fun =
+   mask $ \restore ->
+      forkIO $ do r <- try (restore action); fun r
+#+END_SRC
+
+Now the original =async= can be rewritten as:
+#+BEGIN_SRC
+async :: IO a -> IO (Async a)
+async action = do
+   m <- newEmptyMVar
+   t <- forkFinally action $ putMVar m
+   return $ Async t m
+#+END_SRC
 
 {{{PB}}}
 
