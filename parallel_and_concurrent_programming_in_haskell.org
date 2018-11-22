@@ -1265,6 +1265,47 @@ Operations inside =STM= form a transaction. Operations in a transaction are:
 
 *** Blocking
 
+#+BEGIN_SRC
+retry :: STM a
+#+END_SRC
+
+What =retry= does:
+- abandon current transaction and revert all changes done to =TVars=
+- try again when one of mentioned =TVars= changes (blocked until then)
+
+Example
+
+#+BEGIN_SRC
+type UserFocus = TVar Desktop
+
+getWindows :: Display -> UserFocus -> STM (Set Window)
+getWindows disp focus = do
+   desktop <- readTVar focus
+   readTVar (disp ! desktop)
+
+render :: Set Window -> IO ()
+render = ...
+
+renderThread :: Display -> UserFocus -> IO ()
+renderThread disp focus = do
+   wins <- atomically $ getWindows disp focus   ;; transaction (1)
+   loop wins
+   where
+      loop wins = do
+         redner wins
+         next <- atomically $ do                ;; transaction (2)
+            wins' <- getWindows disp focus
+            if (wins == wins')
+               then retry
+               else return wins
+         loop next
+#+END_SRC
+
+Here, *transaction (2)*:
+- will block on =retry= if the set of windows hasn't changed
+- will be unblocked and rerun every time the =TVar= (that represents user focus of the type =UserFocus= changes) expecting some thread changed the =TVar=
+- will be blocked again if the set of windows hasn't changed yet
+
 *** Merging
 
 *** Asynchronous Exceptions Safety
