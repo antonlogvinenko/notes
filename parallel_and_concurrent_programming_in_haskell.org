@@ -1308,7 +1308,43 @@ Here, *transaction (2)*:
 
 *** Merging
 
+#+BEGIN_SRC
+orElse :: STM a -> STM a -> STM a
+#+END_SRC
+
+What =orElse a b= does:
+- returns =a= if =a= succeeds
+- if =a= retries then =b= is executed
+
+Note that =orElse= is left biased:
+ - can have implications for fairness
+ - must decide if it fits application requriements
+
+There two ways to compose =STM= operations:
+ - =>>== is "and"
+ - =orElse= is "or"
+
+Examples
+#+BEGIN_SRC
+takeEitherTMVar :: TMVar a -> TMVar b -> STM (Either a b)
+takeEitherTMVar ma mb =
+   fmap Left (takeTMvar ma)
+      `orElse`
+   fmap Right (takeTMvar mb)
+
+waitAny :: [Async a] -> IO a
+waitAny asyncs = atomically $ foldr orElse retry $ map waitSTM asyncs
+#+END_SRC
+
 *** Asynchronous Exceptions Safety
+
+#+BEGIN_SRC
+throwSTM :: Exception e => e -> STM a
+catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
+#+END_SRC
+
+If there's *an exception*, either syncrhonous or asynchronous, during STM execution,
+then *all effects are discarded.*
 
 *** What Can't Be Done with STM
 
