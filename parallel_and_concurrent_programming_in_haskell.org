@@ -1236,6 +1236,43 @@ async action = do
 
 ** Software Transactional Memory
 
+*** STM type and operations
+
+#+BEGIN_SRC
+data STM a
+instance Monad STM
+
+data TVar a
+newTVar   :: a -> STM (TVar a)
+readTVar  :: TVar a -> STM a
+writeTVar :: TVAr a -> a -> STM ()
+
+retry  :: STM a
+orElse :: STM a -> STM a -> STM a
+
+throwSTM :: Exception e => e -> STM a
+catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
+#+END_SRC
+
+Operations inside =STM= form a transaction. Operations in a transaction are:
+- *Transparent* to the rest of the program. There is no need to order operations based on what might happen outside of your *STM*:
+ - *No deadlocks* caused by different MVar acquire/release orders.
+ - *No need to acquire all MVars* before modification to avoid mixed state.
+- *Composable*. Operations can be composed in larger =STMs=. This is why =STM= operations are provided without =atomically= wrapper.
+- *Atomical*. =STM= is a different type from =IO=:
+ - =STM= tracks all effects & can roll them back.
+ - Effects are supposed to be only on =TVars= --- no arbitrary side effects allowed.
+
+*** Blocking
+
+*** Merging
+
+*** Asynchronous Exceptions Safety
+
+*** What Can't Be Done with STM
+
+*** Performance
+
 {{{PB}}}
 
 ** Higher Level Concurrency Abstractions
