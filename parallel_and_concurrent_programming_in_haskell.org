@@ -1346,9 +1346,53 @@ catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
 If there's *an exception*, either syncrhonous or asynchronous, during STM execution,
 then *all effects are discarded.*
 
-*** What Can't Be Done with STM
+*** What Can't Be Done with STM: STM vs MVar
+
+**** =MVar= is in general faster than =STM=
+
+This doesn't mean the code using =MVar= is always faster than the code using =STM=.
+
+**** =MVar= advantage is *fairness*
+
+- Threads blocked on =MVar= will be:
+ - *woken up in FIFO order*
+ - *no single thread is blocked forever* when both:
+  - there's supply of =putMVar= invocations
+  - no thread holds =MVar= 100% of the time
+- Threads blocked on =TVar=:
+ - specific waited condition is not known ==>= have to *wake up all threads* for they all might (in general) make progress
+ - *no fairness guarantee* since all threads are being woke up
+
+Also, we can't even implement fairness using =STM=:
+
+#+BEGIN_SRC
+data TMVar a = TMVar (TVar (Maybe a))
+                     (TVar [TVar (Maybe a)])
+#+END_SRC
+
+Here we have a =TVar= with a value and a list of =TVars= that represent operations.
+Possible states:
+- =TVar= is empty
+ - list of operations is empty
+ - list of operations contains =MVars= that are empty and were put by =takeMVar= operations; these operations are blocked on these =MVars= and wait for a value to be set
+- =TVar= has a value
+ - list of operations is empty
+ - list of operations contains =MVars= with values put by =putMVar= operations blocked on these =MVars= waiting for them to be read
+
+Implementation of =putMVar= would behave as follows:
+- if =TVar= is empty and there are no blocked =takeMVar= operations: store the value and return
+- if =TVar= is empty and there are some blocked =takeMVar= operations: remove the first blocked operations, supply it's =TVar= with the value and return
+- if =TVar= is full: *put =TVar= containing =Just a= in the list* of waiting blocked operations and *block until this =TVar becomes empty* (someone reads it)
+
+The last one is something we can't do using =STM=: we *can't both modify a list (perform an effect) and retry at the same time.*
+
+In general, =STM= *can't express multiway communication between threads* if these operations need to:
+- block
+- have a visible effect advertising that they are blocked
 
 *** Performance
+
+
 
 {{{PB}}}
 
