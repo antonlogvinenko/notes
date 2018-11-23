@@ -1392,7 +1392,36 @@ In general, =STM= *can't express multiway communication between threads* if thes
 
 *** Performance
 
+There are several aspects of =STM= implementation to be aware of:
 
+**** Log of operations
+
+An =STM= transaction accumulates a log of =readTVar= & =writeTVar= operations
+ - *discarding effects* is easy if you store operations instead of applying them ==>= *fixed small cost of transaction aborting*
+ - *retrying is easy*: all =TVars= that might change can be found in the log
+ - but *each =readTVar= has to traverse the log to check if the =TVar= was written by some other =TVar= in the transaction*
+
+**** When transaction ends
+
+=STM= implementation will compare the log against the contents of main memory:
+- if =readTVar= *initially read different values*, then *the log is discarded and the transaction reruns* from the very beginning
+- otherwise, *transaction is committed* to the memory
+ - for the duration of the commit, all =TVars= involved in the transaction are locked
+  - transactions operating on disjoint sets of =TVars= will proceed without interference
+
+**** When transaction retries
+
+- Every =TVar= has a *watch list of threads that should be woken up*
+- =retry= operation finds all =TVars= accessed by the transaction and adds current thread to the watch list of all found =TVars=
+- When transaction is committed *all threads in all =TVar= watch list are woken up*
+
+**** Tips
+
+- *Don't read unbounded number of =TVars= in a single transaction*
+ - =readTVar= is =O(n)= ==>= whole transaction complexity is =O(n^2)= where =n= is the number of =TVars=.
+- *Expensive evaluation inside transaction* increases the chance of reexecution (due to another transaction successful change of same =TVars=).
+- Watch out *composing too many blocking operations*, as in =atomicatlly $ mapM takeMVar ts=
+ - If =TVars= become available one at a time then the transaction will reexecute for each of them, so the complexity of transaction would be =O(n^2)=.
 
 {{{PB}}}
 
