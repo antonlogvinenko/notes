@@ -1549,7 +1549,73 @@ instance Functor Async where
 
 **** Inspecting Thread Status
 
+#+BEGIN_SRC
+threadStatus :: ThreadId -> IO ThreadStatus
+
+data ThreadStatus
+   = ThreadRunning
+   | ThreadFinished
+   | ThreadBlocked BlockReason
+   | ThreadDied
+   deriving (Eq, Ord, Show)
+
+data BlockReason
+   = BlockedOnMVar
+   | BlockedOnBlackHole
+   | BlockedOnException
+   | BlockedOnSTM
+   | BlockedOnForeignCall
+   | BlockedOnOther
+#+END_SRC
+
+Use =threadStatus= only for debugging purposes:
+- it breaks abstractions
+- its result is out of date as soon as it returns
+
 **** Detecting Deadlocks
+
+GHC runtime system can detect when a thread has become deadlocked and send it the =BlockedIndefinitelyOnMVar= exception.
+- =MVar= and threads are objects in heap
+- =MVar= points to all threads that are blocked on it
+- =root set= is all runnable threads and their stacks
+- if a thread is unreachable from =root set= then it is considered to be deadlocked
+
+For example: if a *thread is blocked on an =MVar= that is not referenced by any other thread*,
+then both the =MVar= and blocked thread will be unreachable, and the thread is sent =BlockedIndefinitelyOnMVar=.
+Same for *being blocked on =STM=* with =BlockedIndefinitelyOnSTM= exception.
+
+Same for a *group of mutually deadlocked threads*.
+In the following example, both threads are blocked on =MVars= unreachable from the rest of the program,
+so both thread will receive =BlockedIndefinitelyOnMVar=.
+
+There are *two consequences* of this behavior.
+
+*First*, sometimes GHC runtime will do a little more thread killing than required:
+#+BEGIN_SRC
+main = do
+   lock <- newEmptyMVar
+   complete <- newEmptyMVar
+   forkIO $ takeMVar lock `finally` putMVar complete ()
+   takeMVar complete
+#+END_SRC
+Here, the runtime system decides that both main and child threads are deadlocks and kills both.
+But it was only enough to kill the child thread, and that would unblock the main thread.
+
+*Second*, sometimes GHC can't prove there is a deadlock, so it does nothing:
+#+BEGIN_SRC
+main = do
+   lock <- newEmptyMVar
+   forkIO $ do r <- try (takeMVar lock); print (r :: Either SomeException ())
+   threadDelay 1000000
+   print (lock == lock)
+#+END_SRC
+Here, from the point of view of runtime system, the =lock= is used not only in the child thread, so it's not considered deadlocked.
+
+*Do not rely on deadlock detection for the correct working of your program*.
+Whether =lock= is considered to be used or not (outside of some thread) depends on whether the compiler performs optimization of =isPrime 43=:
+#+BEGIN_SRC
+if isPrime 43 then return () else putMVar lock ()
+#+END_SRC
 
 *** Concurrency and the Foreign Function Interface
 
