@@ -1502,7 +1502,43 @@ timeout n m
 
 *** Adding a Functor Instance
 
+**** Motivation
 
+In =waitAny= we might want to wait for several =Asyncs=, but they might have different types:
+#+BEGIN_SRC
+waitAny :: [Async] -> IO a
+waitAny asyncs = atomically $ foldr orElse retry $ map waitSTM asyncs
+#+END_SRC
+
+**** Solution: add a Functor instance
+
+#+BEGIN_SRC
+class Functor f where 
+   fmap :: (a -> b) -> f a -> f b
+#+END_SRC
+
+**** Problem with adding a Functor instance
+
+We can't operate on =TVar= with =fmap=: it's effectful, must be inside =STM=
+#+BEGIN_SRC
+data Async a = Async ThreadId (TMVar (Either SomeException a))
+#+END_SRC
+
+**** Solution
+
+Let's replace =TVar= with =STM=
+
+#+BEGIN_SRC
+data Async a = Async ThreadId (STM (Either SomeException a))
+
+instance Functor Async where
+   fmap f (Async t stm) = Async t stm'
+      where stm' = do
+         r <- stm
+         case r of
+            Left e -> return (Left e)
+            Right a -> return (Right (f a))
+#+END_SRC
 
 {{{PB}}}
 
