@@ -1542,4 +1542,64 @@ instance Functor Async where
 
 {{{PB}}}
 
+
 ** Debugging, Tuning, and Interfacing with Foreign Code
+
+*** Debugging Concurrent Programs
+
+**** Inspecting Thread Status
+
+**** Detecting Deadlocks
+
+*** Concurrency and the Foreign Function Interface
+
+**** Foreign Out-Calls
+
+In Haskell, threads are lightweight and managed in user space by the runtime system.
+
+When a Haskell *thread makes a foreign call*:
+- another OS thread is created
+- the responsibility of running the remaining Haskell threads is handed over to the new OS thread
+- the current thread makes the foreign call
+
+**** Foreight Out-Calls and Bound Threads
+
+In some cases a *foreign code must be called by a particular OS thread*:
+- Libraries that allow only one particluar OS thread to use their APIs
+- APIs that use internal thread-local state
+
+To solve this problem you can use *bound threads* using =forkOS=.
+A *bound thread* is a Haskell thread/OS thread pair that guarantees that
+foreign calls made by the Haskell thread always take place in the associated OS thread.
+#+BEGIN_SRC
+forkOS :: IO () -> IO ThreadId
+#+END_SRC
+
+Performance considerations:
+- new OS thread is created which is more expensive than a Haskell thread
+- bound Haskell threads are more expensive than unbound threads: switching between them means context-switching OS threads
+
+=main= thread is also a bound thread, which means that its communication with other Haskell thread will lead to context-switching OS threads.
+
+**** Asynchronous Exceptions and Foreign Calls
+
+There is no way to interrupt a foreign call, so the runtime system waits until the call returhs before raising the exception.
+The thread blocked in a foreign call is unresponsive to timeouts, interrupts, and asynchronous exceptions.
+
+The trick is to perform the foreign call in a separate thread:
+
+#+BEGIN_SRC
+do
+   a <- async $ c_read fd buf size
+   f <- wait a
+   ...
+#+END_SRC
+
+Do no use =withAsync=: it will block itself trying to kill the thread.
+
+**** Threads and Foreign In-Calls
+
+Each call of exposed Haskell API becomes a new *bound thread*:
+- a new thread is created for each call
+- the Haskell thread is boudn to the OS thread that made the call
+ - important for dealing with GUI callbacks
