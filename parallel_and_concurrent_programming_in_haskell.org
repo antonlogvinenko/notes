@@ -1427,6 +1427,83 @@ An =STM= transaction accumulates a log of =readTVar= & =writeTVar= operations
 
 ** Higher Level Concurrency Abstractions
 
+*** Symmetric Concurrency Combinators
+
+**** =waitBoth=, =waitEither=, =waitAsync=
+
+We've already defined =waitEither=, let's also define =waitBoth= and =waitAsync=:
+#+BEGIN_SRC
+waitEither :: Async a -> Async b -> IO (Either a b)
+
+waitBoth :: Async -> Async b -> IO (a, b)
+waitBoth a1 a2 = do
+   atomically $ do
+      r1 <- waitSTM a1 `orElse` (do waitSTM a2; retry)   ;; (1)
+      r2 <- waitSTM a2
+      return (r1, r2)
+
+waitAsync :: IO a -> (Async -> IO b) -> IO b
+waitAsync io operation = bracket (async io) cancel operation
+#+END_SRC
+
+Note the =orElse= in =(1)=:
+- Both =r1= and =r2= can have 3 outcomes: *successful*, *retried*, *exception*.
+- =waitBoth= must be symmetric, i.e. =waitBoth r1 r2= must have the same kind of outcome as =waitBoth r2 r1=.
+ - the same kind of outcome, not the same outcome: if both =r1= and =r2= throw an exception, we can rethrow only one of them
+- if we ignore *exception* outcome for a moment, it's obvious that implementation without =orElse= in =(1)= would be symmetric:
+ - both *successful* results lead to *successful* result of =waitBoth=
+ - a single *retried* in either =a1= or =a2= (or in both) means *retried* result of =waitBoth=.
+- Now let's get back to *exception* outcome and put it back to possible outcomes:
+ - *exception* and *successful* outcomes work well together without *orElse* in =(1)=: an *exception* for either of arguments means and *exception* for the whole =waitBoth=
+ - but *exception* and *retry* outcomes of arguments don't play well together without =orElse= in =(1)=:
+  - if =a1= throws, =a2= retries, then =waitBoth= throws
+  - if =a1= retries, =a2= throws, then =waitBoth= retries --- i.e. it ignores the exception of =a2=, so we add =orElse= in =(1)= just to check for a possible exception thrown by =a2= to make =waitBoth= symmetrical
+
+Note about =withAsync= implementation:
+ if embedded code (operation arg) fails with exception then withAsync will cancel the thread & rethrow the exception ==>= no thread leackage.
+
+**** =concurrently= and =race=
+
+Let's use =waitBoth=, =waitEither=, and =waitAsync= defined above:
+
+#+BEGIN_SRC
+concurrently :: IO a -> IO b -> IO (a, b)
+concurrently ioa iob =
+   withAsync ioa $ \a ->      ;; (2)
+      withAsync iob $ \b ->   ;; (2)
+         waitBoth a b         ;; (3)
+
+race :: IO a -> IO b -> IO (a, b)
+race ioa iob =
+   withAsync ioa $ \a ->      ;; (2)
+      withAsync iob $ \b ->   ;; (2)
+         waitEither a b       ;; (3)
+#+END_SRC
+
+Functions =concurrently= and =race= imply two rules for concurrent trees of computation that they allow to define:
+- if a thread throws an exception then children threads will be cancelled (async ThreadKilled exception)
+- if a child thread raised an exception it is propagated to the parent
+
+In other words, exception at every level kills all children and propagates upwards, i.e. the whole tree is destroyed.
+
+**** Timeout using =race=
+
+#+BEGIN_SRC
+timeout :: Int -> IO a -> IO (Maybe a)
+timeout n m
+   | n < 0     = fmap Just m
+   | n == 0    = return Nothing
+   | otherwise = do
+         r <- race (threadDelay n) m
+         case r of
+            Left _  -> return Nothing
+            Right a -> return (Just a)
+#+END_SRC
+
+*** Adding a Functor Instance
+
+
+
 {{{PB}}}
 
 ** Debugging, Tuning, and Interfacing with Foreign Code
