@@ -1,0 +1,22 @@
+#+Title: Beej's Guide to Unix IPC: Summary
+#+Author: Anton Logvinenko
+#+Email: anton.logvinenko@gmail.com
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
+#+latex_header: \usepackage{parskip}
+#+latex_header: \linespread{1}
+#+MACRO: PB @@latex:\pagebreak@@ @@html: <br/><br/><br/><hr/><br/><br/><br/>@@ @@ascii: |||||@@
+#+LATEX_HEADER: \usepackage[margin=0.75in]{geometry}
+
+{{{PB}}}
+
+* Intro
+This is a summary of [[https://beej.us/guide/bgipc/]["Beej's Guide to Unix IPC"]]
+
+An =*.org= file containing sources of this document can be found [[https://github.com/antonlogvinenko/notes/blob/master/unix_ipc_guide.org][here]].
+
+{{{PB}}}
+
+* A fork() Primer
+TBD
+
+{{{PB}}}
