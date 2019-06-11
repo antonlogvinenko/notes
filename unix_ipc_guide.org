@@ -17,6 +17,27 @@ An =*.org= file containing sources of this document can be found [[https://githu
 {{{PB}}}
 
 * A fork() Primer
-TBD
+Ways to *wait* for a child process:
+ * =wait()= -- waiting for any child process
+ * =waitpid()= --wait for a specific child, child pid must be acquired from a call to =fork()= -- no other way to get it: parent-to-chiild is one-to-many
+
+Both kinds of waiting can *either read or discard* child process result:
+ * =wait(NULL)= or =waitpid(pid, NULL, 0)= to discard what child process returns
+ * =wait(&rv)= or =waitpid(pid, $rv, 0)= to read child process result with =WEXITSTATUS(rv)= where =rv= is an =int=. 
+
+The parent can ignore the =SIGCHLD= signal, in this case the parent does not have to wait for the child process:
+#+BEGIN_SRC C
+signal(SIGCHLD, SIG_IGN);
+#+END_SRC
+
+If a child dies, it will become a zombie and will be present in *ps* output as =<defunct>= and then:
+ * either a parent process does one of these while alive:
+  ** ignored this event using =signal(SIGCHLD, SIG_IGN)=
+  ** or  performs =wait= on it
+ * or the child process is reparented to the *init* process
+
+TBD more on reparenting to init
+TBD fork returning value and copying of data
+TBD reformat this paragraph
 
 {{{PB}}}
