@@ -1,0 +1,32 @@
+#+Title: Memory Models
+#+Author: Anton Logvinenko
+#+Email: anton.logvinenko@gmail.com
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
+#+latex_header: \usepackage{parskip}
+#+latex_header: \linespread{1}
+#+MACRO: PB @@latex:\pagebreak@@ @@html: <br/><br/><br/><hr/><br/><br/><br/>@@ @@ascii: |||||@@
+#+LATEX_HEADER: \usepackage[margin=0.75in]{geometry}
+
+
+* Data race, race condition
+If there’s no enforced ordering between two accesses to a single memory location from separate threads,
+one or both of those accesses is not atomic,
+and if one or both is a write,
+then this is a *data race and causes undefined behavior.*
+
+A race condition is a semantic error. It is a flaw that occurs in the timing or the ordering of events that leads to erroneous program behavior.
+
+
+* Modification order
+The *modification order* is composed of all the writes to that object from all threads in the program, starting with the object’s initialization.
+
+If different threads see distinct sequences of values for a single variable, you have a *data race and undefined behavior.*
+All threads must agree on the modification orders of each individual object in a program, although they don’t necessarily have to agree on the relative order of operations on separate objects.
+
+Modification order means:
+ * _Once_ a thread _has seen_ a particular entry in the modification order
+   * _subsequent reads_ from that thread must return later values
+   * _subsequent writes_ from that thread to that object must _occur later_ in the modification order
+ * _A read_ of an object that _follows a write_ to that object in the same thread must either:
+   * return the value written
+   * or another value that occurs later in the modification order of that object
