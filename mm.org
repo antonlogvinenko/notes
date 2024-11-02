@@ -6,19 +6,20 @@
 #+latex_header: \linespread{1}
 #+MACRO: PB @@latex:\pagebreak@@ @@html: <br/><br/><br/><hr/><br/><br/><br/>@@ @@ascii: |||||@@
 #+LATEX_HEADER: \usepackage[margin=0.75in]{geometry}
+#+OPTIONS: ^:nil
 
 
 * Data race, race condition
-If there’s no enforced ordering between two accesses to a single memory location from separate threads,
+/If there’s no enforced ordering between two accesses to a single memory location from separate threads,
 one or both of those accesses is not atomic,
 and if one or both is a write,
-then this is a *data race and causes undefined behavior.*
+then this is a *data race and causes undefined behavior.*/
 
-A race condition is a semantic error. It is a flaw that occurs in the timing or the ordering of events that leads to erroneous program behavior.
+/A *race condition* is a semantic error. It is a flaw that occurs in the timing or the ordering of events that leads to erroneous program behavior./
 
 
 * Modification order
-The *modification order* is composed of all the writes to that object from all threads in the program, starting with the object’s initialization.
+/The *modification order* is composed of all the writes to that object from all threads in the program, starting with the object’s initialization./
 
 If different threads see distinct sequences of values for a single variable, you have a *data race and undefined behavior.*
 All threads must agree on the modification orders of each individual object in a program, although they don’t necessarily have to agree on the relative order of operations on separate objects.
@@ -30,3 +31,33 @@ Modification order means:
  * _A read_ of an object that _follows a write_ to that object in the same thread must either:
    * return the value written
    * or another value that occurs later in the modification order of that object
+
+
+      
+* The synchronizes-with relationship
+/A suitably-tagged atomic write operation, W, on a variable, x, *synchronizes with* a suitably-tagged atomic read operation on x that reads the value stored by:/
+ * /either that write, W,/
+ * /or a subsequent atomic write operation on x by the same thread that performed the initial write, W,/
+ * /or a sequence of atomic read-modify-write operations on x (such as fetch_add() or compare_exchange_weak()) by any thread,/
+ * /where the value read by the first thread in the sequence is the value written by W/
+
+The *synchronizes-with* relationship is something that you can get only between operations on atomic types.
+
+Operations on a data structure (such as locking a mutex) might provide this relationship
+if the data structure contains atomic types and the operations on that data structure perform the appropriate atomic operations internally,
+but fundamentally it comes only from operations on atomic types.
+
+All operations on atomic types are suitably tagged by default.
+
+* The happens-before relationship
+/Operation A *happens before* operation B if:/
+ * /in a single thread, operation A is sequenced before operation B: PO is included in HB/
+ * /if operation A in one thread *synchronizes with* operation B in another thread, then A *happens before* B: SW is included in HB/
+ * /if operation A happens before operation B, and operation B happens before operation C, then A happens before C: HB is transitive/
+
+* Memory ordering for atomic operations
+
+* Links:
+ * [[https://eel.is/c++draft/intro.races]]
+ * [[https://timsong-cpp.github.io/cppwp/n4659/intro.multithread]]
+ * [[https://stackoverflow.com/questions/70554277/what-is-the-significance-of-strongly-happens-before-compared-to-simply-happ]]
