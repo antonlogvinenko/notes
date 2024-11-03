@@ -121,6 +121,21 @@ This makes it easy to reason about the behavior of code written with atomic vari
     assert(z.load()!=0);                         *(5)*
   }
 #+END_SRC
+
+The assert *(5)* can never fire, because either the store to =x= *(1)* or the store to =y= *(2)* must happen first, even though it’s not specified which.
+
+If the load of =y= in =read_x_then_y= *(3)* returns =false=
+ * =x= was stored at that point, while =y= was not stored yet
+ * i.e., the store to =x= must occur before the store to =y=
+ * in which case  in =read_y_then_x= *(4)* when =y= is read as =true= in the while loop, we know that =x= was already written to: =x= is guaranteed to be read as =true= in *(4)*
+ * meaning =z= can't be =0= in the end of execution *(5)*
+ * or, (only) the opposite (symmetrical) scenario is possible: =y= write occurs strictly before =x=, with the same outcome: =z= can't be =0= in the end *(5)*
+
+#+CAPTION: Sequential consistency and happens-before
+#+NAME:   fig:SED-HR4049
+#+ATTR_HTML: :width 800px
+[[./seq-cst.png]]
+
    
 * Relaxed ordering
 
