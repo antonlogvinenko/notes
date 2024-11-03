@@ -11,7 +11,7 @@
 
 * Data race, race condition
 /If there’s no enforced ordering between two accesses to a single memory location from separate threads,
-one or both of those accesses is not atomic, and if one or both is a write, then this is a *data race and causes undefined behavior.*/
+one or both of those accesses is not atomic, and if one or both is a write, then this is a *data race and causes undefined behavior.* /
 
 /A *race condition* is a semantic error. It is a flaw that occurs in the timing or the ordering of events that leads to erroneous program behavior./
 
