@@ -56,8 +56,77 @@ All operations on atomic types are suitably tagged by default.
  * /if operation A happens before operation B, and operation B happens before operation C, then A happens before C: HB is transitive/
 
 * Memory ordering for atomic operations
+/Six memory ordering options:/
+ * /*relaxed ordering*/
+  * /memory_order_relaxed/
+ * /*acquire-release ordering*/
+  * /memory_order_acquire/
+  * /memory_order_release/
+  * /memory_order_acq_rel/
+  * /memory_order_consume/
+ * /*sequentially consistent ordering*/
+   * /memory_order_seq_cst/
 
-* Links:
+* Sequentially consistent ordering
+/The default ordering is named *sequentially consistent* because it implies that
+the behavior of the program is consistent with a simple sequential view of the world.
+If all operations on instances of atomic types are *sequentially consistent*, the behavior of a multithreaded program is *as if all these operations were
+performed in some particular sequence by a single thread*./
+
+This makes it easy to reason about the behavior of code written with atomic variables.
+ * You can write down all the possible sequences of operations by different threads, eliminate
+   those that are inconsistent, and verify that your code behaves as expected in the others.
+ * Operations can’t be reordered; if your code has one operation
+   before another in one thread, that ordering must be seen by all other threads.
+
+#+BEGIN_SRC cpp
+  #include <atomic>
+  #include <thread>
+  #include <assert.h>
+  std::atomic<bool> x,y;
+  std::atomic<int> z;
+  void write_x()
+  {
+    x.store(true,std::memory_order_seq_cst);     *(1)*
+  }
+  void write_y()
+  {
+    y.store(true,std::memory_order_seq_cst);     *(2)*
+  }
+  void read_x_then_y()
+  {
+    while(!x.load(std::memory_order_seq_cst));
+    if(y.load(std::memory_order_seq_cst))        *(3)*
+      ++z;
+  }
+  void read_y_then_x()
+  {
+    while(!y.load(std::memory_order_seq_cst));
+    if(x.load(std::memory_order_seq_cst))        *(4)*
+      ++z;
+  }
+  int main()
+  {
+    x=false;
+    y=false;
+    z=0;
+    std::thread a(write_x);
+    std::thread b(write_y);
+    std::thread c(read_x_then_y);
+    std::thread d(read_y_then_x);
+    a.join();
+    b.join();
+    c.join();
+    d.join();
+    assert(z.load()!=0);                         *(5)*
+  }
+#+END_SRC
+   
+* Relaxed ordering
+
+* Acquire-release ordering
+
+* Links
  * [[https://eel.is/c++draft/intro.races]]
  * [[https://timsong-cpp.github.io/cppwp/n4659/intro.multithread]]
  * [[https://stackoverflow.com/questions/70554277/what-is-the-significance-of-strongly-happens-before-compared-to-simply-happ]]
