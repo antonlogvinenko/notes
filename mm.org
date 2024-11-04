@@ -11,7 +11,7 @@
 
 * Data race, race condition
 /If there’s no enforced ordering between two accesses to a single memory location from separate threads,
-one or both of those accesses is not atomic, and if one or both is a write, then this is a *data race and causes undefined behavior.* /
+one or both of those accesses is not atomic, and if one or both is a write, then this is a *data race and causes undefined behavior*./
 
 /A *race condition* is a semantic error. It is a flaw that occurs in the timing or the ordering of events that leads to erroneous program behavior./
 
@@ -134,8 +134,22 @@ If the load of =y= in =read_x_then_y= *(3)* returns =false=
 #+ATTR_HTML: :width 800px
 [[./seq-cst.png]]
 
-   
+* Non-sequentially consistent memory orderings
+/In *non-sequantially consistent* memory orderings:/
+ * /There is *no single global order* of events: threads don't have to agree on the order of events/
+ * /The only requirement is that all threads agree on the *modification order of each individual variable*./
+
+Non-sequentially consistent memory orderings:
+ * relaxed ordering
+ * acquire-release ordering
+
 * Relaxed ordering
+/Operations on atomic types performed with relaxed ordering/
+ * /don’t participate in *synchronizes-with* relationships./
+ * /*modification order* is the only thing that is guaranteed/
+   * /accesses to a single atomic variable from the same thread can’t be reordered:
+     once a given thread has seen a particular value of an atomic variable, a subsequent read by that thread can’t retrieve
+     an earlier value of the variable./
 
 * Acquire-release ordering
 
