@@ -93,14 +93,14 @@ This makes it easy to reason about the behavior of code written with atomic vari
   }
   void read_x_then_y()
   {
-    while(!x.load(std::memory_order_seq_cst));
-    if(y.load(std::memory_order_seq_cst))        *(3)*
+    while (!x.load(std::memory_order_seq_cst));
+    if (y.load(std::memory_order_seq_cst))        *(3)*
       ++z;
   }
   void read_y_then_x()
   {
-    while(!y.load(std::memory_order_seq_cst));
-    if(x.load(std::memory_order_seq_cst))        *(4)*
+    while (!y.load(std::memory_order_seq_cst));
+    if (x.load(std::memory_order_seq_cst))        *(4)*
       ++z;
   }
   int main()
@@ -144,14 +144,51 @@ Non-sequentially consistent memory orderings:
  * acquire-release ordering
 
 * Relaxed ordering
-/Operations on atomic types performed with relaxed ordering/
+/Operations on atomic types performed with relaxed ordering:/
  * /don’t participate in *synchronizes-with* relationships./
  * /*modification order* is the only thing that is guaranteed/
    * /accesses to a single atomic variable from the same thread can’t be reordered:
      once a given thread has seen a particular value of an atomic variable, a subsequent read by that thread can’t retrieve
      an earlier value of the variable./
 
-* Acquire-release ordering
+#+BEGIN_SRC cpp
+    #include <atomic>
+    #include <thread>
+    #include <assert.h>
+    std::atomic<bool> x,y;
+    std::atomic<int> z;
+    void write_x_then_y()
+    {
+       x.store(true,std::memory_order_relaxed);  *(1)*
+       y.store(true,std::memory_order_relaxed);  *(2)*
+    }
+    void read_y_then_x()
+    {
+      while (!y.load(std::memory_order_relaxed));  *(3)*
+      if (x.load(std::memory_order_relaxed))       *(4)*
+	++z;
+    }
+    int main()
+    {
+      x=false;
+      y=false;
+      z=0;
+      std::thread a(write_x_then_y);
+      std::thread b(read_y_then_x);
+      a.join();
+      b.join();
+      assert(z.load() != 0);              *(5)*
+  }
+#+END_SRC
+
+
+The assert *(5)* can fire
+ * We see that *(1)* is followed by *(2)* and =y= set to =true= after =x= is set to =true=
+ * In *(3)* =y= will be eventually read as =true=
+ * But the model is relaxed, so there is no SW relationship between the write in *(2)* and the read in *(3)*
+ * Meaning there is no guarantee that the read in *(4)* will see =x= set to =true=, even if =y= was read as =true=
+ 
+* Acquire-release orderinga
 
 * Links
  * [[https://eel.is/c++draft/intro.races]]
