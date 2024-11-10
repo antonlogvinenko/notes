@@ -201,6 +201,9 @@ The assert *(5)* can fire
 
 /A release operation synchronizes-with an acquire operation that reads the value written./
 
+The result in the previous example is impossible to get when using release acquire ordering.
+Consider another example instead, the rework of the code from sequentially consistent section.
+
 #+BEGIN_SRC cpp
   #include <atomic>
   #include <thread>
@@ -243,6 +246,11 @@ The assert *(5)* can fire
     assert(z.load()!=0);                         *(5)*
   }
 #+END_SRC
+
+There is no global order.
+ * =x= set to =true= in *(1)* happens-before =false= is loaded from =y= in *(3)*
+ * =y= set to =true= in *(2)*  happens-before =x= is read in *(4)*
+ * but there is not global order, so we can't say that *(2)* happens-before *(3)*. i.e. it might looke like =false= was not read from =y= before =y= was set to =true=: not related
 
 #+CAPTION: Acquire release and happens-before
 #+NAME:   fig:SED-HR4049
