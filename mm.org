@@ -181,6 +181,11 @@ Non-sequentially consistent memory orderings:
   }
 #+END_SRC
 
+#+CAPTION: Relaxed atomics and happens-before
+#+NAME:   fig:SED-HR4049
+#+ATTR_HTML: :width 500px
+[[./relaxed.png]]
+
 
 The assert *(5)* can fire
  * We see that *(1)* is followed by *(2)* and =y= set to =true= after =x= is set to =true=
@@ -188,7 +193,8 @@ The assert *(5)* can fire
  * But the model is relaxed, so there is no SW relationship between the write in *(2)* and the read in *(3)*
  * Meaning there is no guarantee that the read in *(4)* will see =x= set to =true=, even if =y= was read as =true=
  
-* Acquire-release orderinga
+* Acquire-release ordering
+
 
 * Links
  * [[https://eel.is/c++draft/intro.races]]
