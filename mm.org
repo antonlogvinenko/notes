@@ -194,7 +194,60 @@ The assert *(5)* can fire
  * Meaning there is no guarantee that the read in *(4)* will see =x= set to =true=, even if =y= was read as =true=
  
 * Acquire-release ordering
+/Under this ordering model:/
+ * /atomic loads are *acquire* operations (memory_order_acquire)/
+ * /atomic stores are *release* operations (memory_order_release)/
+ * /and atomic read-modify-write operations (such as fetch_add() or exchange()) are either *acquire, release, or both* (memory_order_acq_rel)/
 
+/A release operation synchronizes-with an acquire operation that reads the value written./
+
+#+BEGIN_SRC cpp
+  #include <atomic>
+  #include <thread>
+  #include <assert.h>
+  std::atomic<bool> x,y;
+  std::atomic<int> z;
+  void write_x()
+  {
+    x.store(true,std::memory_order_release);     *(1)*
+  }
+  void write_y()
+  {
+    y.store(true,std::memory_order_release);     *(2)*
+  }
+  void read_x_then_y()
+  {
+    while (!x.load(std::memory_order_acquire));
+    if (y.load(std::memory_order_acquire))        *(3)*
+      ++z;
+  }
+  void read_y_then_x()
+  {
+    while (!y.load(std::memory_order_acquire));
+    if (x.load(std::memory_order_acquire))        *(4)*
+      ++z;
+  }
+  int main()
+  {
+    x=false;
+    y=false;
+    z=0;
+    std::thread a(write_x);
+    std::thread b(write_y);
+    std::thread c(read_x_then_y);
+    std::thread d(read_y_then_x);
+    a.join();
+    b.join();
+    c.join();
+    d.join();
+    assert(z.load()!=0);                         *(5)*
+  }
+#+END_SRC
+
+#+CAPTION: Acquire release and happens-before
+#+NAME:   fig:SED-HR4049
+#+ATTR_HTML: :width 800px
+[[./acq-rel.png]]
 
 * Links
  * [[https://eel.is/c++draft/intro.races]]
