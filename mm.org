@@ -9,14 +9,15 @@
 #+OPTIONS: ^:nil
 
 
-* Data race, race condition
+* Fundamentals
+** Data race, race condition
 /If there’s no enforced ordering between two accesses to a single memory location from separate threads,
 one or both of those accesses is not atomic, and if one or both is a write, then this is a *data race and causes undefined behavior*./
 
 /A *race condition* is a semantic error. It is a flaw that occurs in the timing or the ordering of events that leads to erroneous program behavior./
 
 
-* Modification order
+** Modification order
 /The *modification order* is composed of all the writes to that object from all threads in the program, starting with the object’s initialization./
 
 If different threads see distinct sequences of values for a single variable, you have a *data race and undefined behavior.*
@@ -32,7 +33,7 @@ Modification order means:
 
 
       
-* The synchronizes-with relationship
+** The synchronizes-with relationship
 /A suitably-tagged atomic write operation, W, on a variable, x, *synchronizes with* a suitably-tagged atomic read operation on x that reads the value stored by:/
  * /either that write, W,/
  * /or a subsequent atomic write operation on x by the same thread that performed the initial write, W,/
@@ -47,7 +48,7 @@ but fundamentally it comes only from operations on atomic types.
 
 All operations on atomic types are suitably tagged by default.
 
-* The happens-before relationship
+** The happens-before relationship
 /Operation A *happens before* operation B if:/
  * /in a single thread, operation A is sequenced before operation B: PO is included in HB/
  * /if operation A in one thread *synchronizes with* operation B in another thread, then A *happens before* B: SW is included in HB/
@@ -65,7 +66,7 @@ All operations on atomic types are suitably tagged by default.
  * /*sequentially consistent ordering*/
    * /memory_order_seq_cst/
 
-* Sequentially consistent ordering
+** Sequentially consistent ordering
 /The default ordering is named *sequentially consistent* because it implies that
 the behavior of the program is consistent with a simple sequential view of the world.
 If all operations on instances of atomic types are *sequentially consistent*, the behavior of a multithreaded program is *as if all these operations were
@@ -134,7 +135,7 @@ If the load of =y= in =read_x_then_y= *(3)* returns =false=
 #+ATTR_HTML: :width 800px
 [[./seq-cst.png]]
 
-* Non-sequentially consistent memory orderings
+** Non-sequentially consistent memory orderings
 /In *non-sequantially consistent* memory orderings:/
  * /There is *no single global order* of events: threads don't have to agree on the order of events/
  * /The only requirement is that all threads agree on the *modification order of each individual variable*./
@@ -143,7 +144,7 @@ Non-sequentially consistent memory orderings:
  * relaxed ordering
  * acquire-release ordering
 
-* Relaxed ordering
+*** Relaxed ordering
 /Operations on atomic types performed with relaxed ordering:/
  * /don’t participate in *synchronizes-with* relationships./
  * /*modification order* is the only thing that is guaranteed/
@@ -194,7 +195,7 @@ The assert *(5)* can fire
  * But the model is relaxed, so there is no SW relationship between the write in *(2)* and the read in *(3)*
  * Meaning there is no guarantee that the read in *(4)* will see =x= set to =true=, even if =y= was read as =true=
  
-* Acquire-release ordering
+*** Acquire-release ordering
 /Under this ordering model:/
  * /atomic loads are *acquire* operations (memory_order_acquire)/
  * /atomic stores are *release* operations (memory_order_release)/
@@ -258,11 +259,24 @@ There is no global order.
 #+ATTR_HTML: :width 800px
 [[./acq-rel.png]]
 
-* Mixing memory orderings
+** Mixing memory orderings
  * Sequentially consistent operations behave like acquire-release
  * Relaxed operations are still relaxed, but participate in SW and HB relationships
 
-* Release sequences and synchronizes-with [TODO]
+* Release sequences and synchronizes-with
+ * /If *the store* is tagged with memory_order_release, memory_order_acq_rel, or memory_order_seq_cst/
+ * /and *the load* is tagged with memory_order_consume, memory_order_acquire, or memory_order_seq_cst/
+ * /and each operation in the chain *loads the value written* by the previous operation/
+   * /*Any atomic read-modify-write operation* in the chain/
+   * /can have *any memory ordering* (even memory_order_relaxed)/
+ * /then the chain of operations constitutes a *release sequence* and the initial store synchronizes with (for memory_order_acquire or memory_order_seq_cst) or is dependency-ordered-before (for memory_order_consume) the final load/
+
+*Release sequence* also introduces a *synchronized-with* relationship.
+
+#+CAPTION: The release sequence for the queue operations
+#+NAME:   fig:SED-HR4049
+#+ATTR_HTML: :width 600px
+[[./release-sequence.png]]
 
 * Fences
 
