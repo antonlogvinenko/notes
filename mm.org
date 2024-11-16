@@ -278,7 +278,7 @@ There is no global order.
 #+ATTR_HTML: :width 600px
 #+ATTR_MARKDOWN: :width 600px
 #+ATTR_ODT: 3
-[[./release-sequence.png]]
+[[./release-sequence.png]][bla]{:height 222, :width 190}
 
 
 * Fences
