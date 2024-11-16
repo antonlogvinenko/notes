@@ -278,6 +278,8 @@ There is no global order.
 #+ATTR_HTML: :width 600px
 [[./release-sequence.png]]
 
+[[./release-sequence2.png]]
+
 * Fences
 
 * Ordering non-atomic operations with atomics
