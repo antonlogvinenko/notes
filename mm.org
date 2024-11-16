@@ -278,7 +278,7 @@ There is no global order.
 #+ATTR_HTML: :width 600px
 [[./release-sequence.png]]
 
-[[./release-sequence2.png]]{:width 600, :height 300}
+[[./release-sequence2.png]]{:height 100, :width 100}
 
 * Fences
 
