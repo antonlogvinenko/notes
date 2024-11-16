@@ -277,11 +277,9 @@ There is no global order.
 #+NAME:   fig:SED-HR4049
 #+ATTR_HTML: :width 600px
 #+ATTR_MARKDOWN: :width 600px
+#+ATTR_ODT: :width 600px
 [[./release-sequence.png]]
 
-[[./release-sequence2.png]]{:height 100, :width 100}
-
-[./release-sequence2.png]{:height 100, :width 100}
 
 * Fences
 
