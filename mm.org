@@ -276,9 +276,7 @@ There is no global order.
 #+CAPTION: The release sequence for the queue operations
 #+NAME:   fig:SED-HR4049
 #+ATTR_HTML: :width 600px
-#+ATTR_MARKDOWN: :width 600px
-#+ATTR_ODT: 3
-[[./release-sequence.png]][bla]{:height 222, :width 190}
+[[./release-sequence.png]]
 
 
 * Fences
