@@ -3,11 +3,12 @@
 #+Email: anton.logvinenko@gmail.com
 #+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
 #+latex_header: \usepackage{parskip}
-#+latex_header: \linespread{1}
+#+latex_header: \usepackage{enumitem}
+#+latex_header: \setlist{nolistsep}
+#+latex_header: \linespread{1.1}
 #+MACRO: PB @@latex:\pagebreak@@ @@html: <br/><br/><br/><hr/><br/><br/><br/>@@ @@ascii: |||||@@
-#+LATEX_HEADER: \usepackage[margin=0.75in]{geometry}
+#+LATEX_HEADER: \usepackage[margin=1.00in]{geometry}
 #+OPTIONS: ^:nil
-
 
 * Fundamentals
 ** Data race, race condition
@@ -15,7 +16,6 @@
 one or both of those accesses is not atomic, and if one or both is a write, then this is a *data race and causes undefined behavior*./
 
 A *race condition* is a semantic error. It is a flaw that occurs in the timing or the ordering of events that leads to erroneous program behavior.
-
 
 ** Modification order
 /The *modification order* is composed of all the writes to that object from all threads in the program, starting with the object’s initialization./
@@ -32,7 +32,6 @@ Modification order means:
    * or another value that occurs later in the modification order of that object
 
 
-      
 ** The synchronizes-with relationship
 /A suitably-tagged atomic write operation, W, on a variable, x, *synchronizes with* a suitably-tagged atomic read operation on x that reads the value stored by:/
  * /either that write, W,/
@@ -146,7 +145,7 @@ Non-sequentially consistent memory orderings:
 
 *** Relaxed ordering
 /Operations on atomic types performed with relaxed ordering:/
- * /don’t participate in *synchronizes-with* relationships./
+ * /don’t participate in *synchronizes-with* relationships/
  * /*modification order* is the only thing that is guaranteed/
    * /accesses to a single atomic variable from the same thread can’t be reordered:
      once a given thread has seen a particular value of an atomic variable, a subsequent read by that thread can’t retrieve
@@ -252,7 +251,7 @@ Consider another example instead, the rework of the code from sequentially consi
 There is no global order.
  * =x= set to =true= in *(1)* happens-before =false= is loaded from =y= in *(3)*
  * =y= set to =true= in *(2)*  happens-before =x= is read in *(4)*
- * but there is not global order, so we can't say that *(2)* happens-before *(3)*. i.e. it might looke like =false= was not read from =y= before =y= was set to =true=: not related
+ * but there is not global order, so we can't say that *(2)* happens-before *(3)*. i.e. it might look like =false= was not read from =y= before =y= was set to =true=: not related
 
 #+CAPTION: Acquire release and happens-before
 #+NAME:   fig:SED-HR4049
@@ -317,6 +316,8 @@ There is no global order.
  * Which means reading the queue_data in the 2nd thread is a *data race*.
 
 * Fences
+
+
 
 * Ordering non-atomic operations with atomics
 
