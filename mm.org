@@ -306,15 +306,15 @@ There is no global order.
 
 #+CAPTION: The release sequence for the queue operations
 #+NAME:   fig:SED-HR4049
-#+ATTR_HTML: :width 600px
+#+ATTR_HTML: :width 800px
 [[./release-sequence.png]]
 
 
-Operations in both consumer threads are atomic.
-Which means either the 1st or the 2nd consuming thread will read the value written by the writing thread.
-If the 1st thread reads (and atomically modifies) that value, then the 2nd thread will read another value.
-If the 2nd thread reads a different value from what was written by the writer thread, it won't have a SW relationship with the writer thread.
-Which means reading the queue_data in the 2nd thread is a data race.
+ * Operations in both consumer threads are *atomic*
+ * Which means either the 1st or the 2nd consuming thread will read the *value written by the writing thread*.
+ * *If the 1st* thread reads (and atomically modifies) that value, *then the 2nd* thread will read another value.
+ * *If the 2nd* thread reads a different value from what was written by the writer thread, it *won't have a SW relationship* with the writer thread.
+ * Which means reading the queue_data in the 2nd thread is a *data race*.
 
 * Fences
 
