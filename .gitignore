@@ -4,3 +4,8 @@
 *.txt
 *.odt
 *.log
+*.toc
+*.out
+*.aux
+*.fls
+*.fdb_latexmk

@@ -316,8 +316,18 @@ There is no global order.
  * Which means reading the queue_data in the 2nd thread is a *data race*.
 
 * Fences
+These are operations that
+ * enforce memory-ordering constraints without modifying any data
+ * are typically combined with atomic operations that use the memory_order_relaxed ordering constraints
 
+Relaxed operations on separate variables can usually be freely reordered by the compiler or the hardware.
+Fences restrict this freedom and introduce happens-before and synchronizes-with relationships that weren’t present before.
 
+ # TODO example here
+ # TODO explanation of an example here
+
+ * if an acquire operation sees the result of a store that takes place after a release fence, the fence synchronizes with that acquire operation
+ * if a load that takes place before an acquire fence sees the result of a  release operation, the release operation synchronizes with the acquire fence
 
 * Ordering non-atomic operations with atomics
 
