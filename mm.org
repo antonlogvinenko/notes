@@ -77,6 +77,7 @@ This makes it easy to reason about the behavior of code written with atomic vari
  * Operations can’t be reordered; if your code has one operation
    before another in one thread, that ordering must be seen by all other threads.
 
+#+CAPTION: Sequential consistency implies a total ordering
 #+BEGIN_SRC cpp
   #include <atomic>
   #include <thread>
@@ -155,6 +156,7 @@ Non-sequentially consistent memory orderings:
      once a given thread has seen a particular value of an atomic variable, a subsequent read by that thread can’t retrieve
      an earlier value of the variable./
 
+#+CAPTION: Relaxed operations have few ordering requirements
 #+BEGIN_SRC cpp
       #include <atomic>
       #include <thread>
@@ -209,6 +211,7 @@ The assert *(5)* can fire
 The result in the previous example is impossible to get when using release acquire ordering.
 Consider another example instead, the rework of the code from sequentially consistent section.
 
+#+CAPTION: Acquire-release doesn’t imply a total ordering
 #+BEGIN_SRC cpp
   #include <atomic>
   #include <thread>
@@ -276,6 +279,7 @@ There is no global order.
 
 *Release sequence* also introduces a *synchronized-with* relationship.
 
+#+CAPTION: Reading values from a queue with atomic operations
 #+BEGIN_SRC cpp
   #include <atomic>
   #include <thread>
@@ -321,10 +325,11 @@ There is no global order.
 
 * Fences
 /These are operations that/
- * relaxed operations on separate variables can usually be freely reordered by the compiler or the hardware
- * fences enforce memory-ordering constraints without modifying any data
- * are typically combined with atomic operations that use the memory_order_relaxed ordering constraints, introducing SW and HB relationships that weren't present before.
+ * /fences enforce memory-ordering constraints without modifying any data/
+ * /are typically combined with atomic operations that use the memory_order_relaxed ordering constraints, introducing SW and HB relationships that weren't present before./
 
+
+#+CAPTION: Relaxed operations can be ordered with fences
 #+BEGIN_SRC cpp
   #include <atomic>
   #include <thread>
@@ -339,9 +344,9 @@ There is no global order.
   }
   void read_y_then_x()
   {
-    while(!y.load(std::memory_order_relaxed));              (4)
+    while (!y.load(std::memory_order_relaxed));             (4)
     std::atomic_thread_fence(std::memory_order_acquire);    (5)
-    if(x.load(std::memory_order_relaxed))                   (6)
+    if (x.load(std::memory_order_relaxed))                  (6)
       ++z;
   }
   int main()
@@ -357,13 +362,70 @@ There is no global order.
   }
 #+END_SRC
 
- # TODO example here
- # TODO explanation of an example here
+The example here works like this '\to' means we're building the only one possible order of executuion):
+ * Read in (4) eventually sees write in (3), thus (3) \to (4)
+ * (2) is a release fence, meaning stores above it aren't moved (reordered) downwards, stores below it aren't moved (reordered) upwards, thus (1) \to (2) \to (3)
+ * (5) is a acquire fence, meaning loads above it aren't move (reordered) downwards, loads below it aren't moved (reordered) upwards, thus (4) \to (5) \to (6)
+ * Transitively: (1) \to (2) \to (3) \to (4) \to (5) \to (6)
+ 
+*The intuition is*:
+ * store must "make everything before it visible the way *it* is visible" (transitively), so the *release* fence must be *above (before)* it
+   #+BEGIN_SRC cpp
+     //some other stores
+     fence(memory_order_release);
+     var.store(42, memory_order_relaxed);
+   #+END_SRC
+ * load must "make everything after it see the same way *it* sees", so *acquire* fence must be *below (after)* it
+   #+BEGIN_SRC cpp
+     load.store(memory_order_relaxed);
+     fence(memory_order_acquire);
+     //some other loads
+   #+END_SRC
 
- * if an acquire operation sees the result of a store that takes place after a release fence, the fence synchronizes with that acquire operation
+ *The general rule is:*
+ * =atomic_thread_fence(memory_order_release)= + =store(memory_order_relaxed)= is equivalent to =store(memory_order_release)=
+ * =load(memory_order_relaxed)= + =atomic_thread_fence(memory_order_acquire)= is equivalent to =load(memory_order_acquire)=
+ * the *synchronization point is the fence itself*, not the relaxed operation: store(s) and loads(s) must be properly located around them (separated by them)
+
+Particularly, *if only one side* is an acquire-release operation, and another is a relaxed operation with a fence, then the previous rule means that:
+ * if an *acquire* operation *sees* the result of a *store* that takes place *after a release fence*, the fence synchronizes with that acquire operation
  * if a load that takes place before an acquire fence sees the result of a  release operation, the release operation synchronizes with the acquire fence
-
+   
 * Ordering non-atomic operations with atomics
+
+#+CAPTION: Non-atomic operations can also be ordered with fences
+#+BEGIN_SRC cpp
+  #include <atomic>
+  #include <thread>
+  #include <assert.h>
+  bool x = false;
+  std::atomic<bool> y;
+  std::atomic<int> z;
+  void write_x_then_y()
+  {
+    x = true                                                (1)
+    std::atomic_thread_fence(std::memory_order_release);    (2)
+    y.store(true,std::memory_order_relaxed);                (3)
+  }
+  void read_y_then_x()
+  {
+    while (!y.load(std::memory_order_relaxed));             (4)
+    std::atomic_thread_fence(std::memory_order_acquire);    (5)
+    if (x)       f                                          (6)
+      ++z;
+  }
+  int main()
+  {
+    x = false;
+    y = false;
+    z = 0;
+    std::thread a(write_x_then_y);
+    std::thread b(read_y_then_x);
+    a.join();
+    b.join();
+    assert(z.load() != 0);
+  }
+#+END_SRC
 
 
 * Links
