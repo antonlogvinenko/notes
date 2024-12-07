@@ -13,7 +13,6 @@
 
 
 
-
 * Fundamentals
 ** Data race, race condition
 /If there’s no enforced ordering between two accesses to a single memory location from separate threads,
@@ -396,7 +395,13 @@ Particularly, *if only one side* is an acquire-release operation, and another is
  * if a load that takes place before an acquire fence sees the result of a  release operation, the release operation synchronizes with the acquire fence
    
 * Ordering non-atomic operations with atomics
+If you replace =x= from the previous listing with an ordinary non-atomic =bool=, the behavior is guaranteed to be the same.
 
+ * Operations with fences can be treated as release-acquire write and read
+ * The acquire read from =y= sees the value written by the release write, so there's a HB between them
+ * Non-atomic write to =x= happens-before the release write to =y= because of PO
+ * Atomic read from =y= happens-before non-atomic read from =x= because of PO
+ * This, transitevly, non-atmonic write to =x= happens-before non-atomic read from =x=
 
 #+ATTR_HTML: :style background-color:black;
 #+CAPTION: Non-atomic operations can also be ordered with fences
@@ -404,21 +409,21 @@ Particularly, *if only one side* is an acquire-release operation, and another is
   #include <atomic>
   #include <thread>
   #include <assert.h>
-  bool x = false;
+  bool x = false;                                           // (1) x is now a plain non-atomic variable
   std::atomic<bool> y;
   std::atomic<int> z;
 //cake
   void write_x_then_y()
   {
-    x = true                                                (1)
-    std::atomic_thread_fence(std::memory_order_release);    (2)
-    y.store(true, std::memory_order_relaxed);               (3)
+    x = true                                                // (2) Store to x before the fence
+    std::atomic_thread_fence(std::memory_order_release);
+    y.store(true, std::memory_order_relaxed);               // (3) Store to y after the fence
   }
   void read_y_then_x()
   {
-    while (!y.load(std::memory_order_relaxed));             (4)
-    std::atomic_thread_fence(std::memory_order_acquire);    (5)
-    if (x)                                                  (6)
+    while (!y.load(std::memory_order_relaxed));             // Wait until you see the write from (2)
+    std::atomic_thread_fence(std::memory_order_acquire);    
+    if (x)                                                  // (4) This will read the value written by (1)
       ++z;
   }
   int main()
@@ -433,6 +438,7 @@ Particularly, *if only one side* is an acquire-release operation, and another is
     assert(z.load() != 0);
   }
 #+END_SRC
+
 
 
 
