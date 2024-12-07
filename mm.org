@@ -450,6 +450,7 @@ In particular, if you replace =x= from the previous listing about fences with an
 
 
 * Links
+ * https://en.cppreference.com/w/cpp/atomic/memory_order
  * [[https://eel.is/c++draft/intro.races]]
  * [[https://timsong-cpp.github.io/cppwp/n4659/intro.multithread]]
  * [[https://stackoverflow.com/questions/70554277/what-is-the-significance-of-strongly-happens-before-compared-to-simply-happ]]
