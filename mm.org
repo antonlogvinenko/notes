@@ -11,7 +11,8 @@
 #+OPTIONS: ^:nil
 
 
-
+* Original work
+These notes are based on the Chapter 5 "The C++ memory model and operations on atomic types" of "C++ Concurrency in Action" book (2nd edition), by Anthony Williams.
 
 * Fundamentals
 ** Data race, race condition
