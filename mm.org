@@ -10,7 +10,6 @@
 #+LATEX_HEADER: \usepackage[margin=1.00in]{geometry}
 #+OPTIONS: ^:nil
 
-
 * Original work
 These notes are based on Chapter 5 "The C++ memory model and operations on atomic types" of "C++ Concurrency in Action" book (2nd edition), by Anthony Williams.
 
@@ -270,7 +269,7 @@ There is no global order.
 
 ** Mixing memory orderings
  * Sequentially consistent operations behave like acquire-release
- * Relaxed operations are still relaxed, but participate in SW and HB relationships
+ * Relaxed operations are still relaxed, but participate in SW and HB relationships (they do not form HB with acq-rel though; needs clarifiation)
 
 ** Release sequences and synchronizes-with
  * /If *the store* is tagged with memory_order_release, memory_order_acq_rel, or memory_order_seq_cst/
